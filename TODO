@@ -1,9 +1,11 @@
 GTetrinet's TODO list
 ~~~~~~~~~~~~~~~~~~~~~
 
+- Get rid of the funky page detach stuff
+
 - Get server list from http://www.tetrinet.org/ip/ (see #104323)
 
-- Make gtetrinet resizeable (at least the fields messages bit)
+- Make gtetrinet fields resizable
 
 - Write a User Manual. (see #105308)
 

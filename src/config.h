@@ -1,13 +1,23 @@
-#include <gconf/gconf-client.h>
+#ifndef __GTETRINET_CONF_H__
+#define __GTETRINET_CONF_H__
 
-extern char blocksfile[1024];
-extern int bsize;
+#include <gconf/gconf-client.h>
+#include <gdk/gdkkeysyms.h>
+#include <gnome.h>
+
+#include "tetrinet.h"
+#include "sound.h"
+#include "fields.h"
+#include "partyline.h"
+
+extern gchar *blocksfile;
+extern gint bsize;
 extern GString *currenttheme;
 extern guint keys[];
 extern guint defaultkeys[];
 
 extern void config_loadtheme (const gchar *themedir);
-extern int config_getthemeinfo (char *themedir, char *name, char *author, char *desc);
+extern gint config_getthemeinfo (char *themedir, char *name, char *author, char *desc);
 extern void config_loadconfig (void);
 extern void config_saveconfig (void);
 
@@ -115,22 +125,4 @@ partyline_enable_channel_list_changed (GConfClient *client,
 #define GTETRINET_THEMES GTETRINET_DATA"/themes"
 #define DEFAULTTHEME GTETRINET_THEMES"/default/"
 
-typedef enum
-{
-  K_RIGHT, 
-  K_LEFT, 
-  K_ROTRIGHT, 
-  K_ROTLEFT,
-  K_DOWN,
-  K_DROP,
-  K_DISCARD,
-  K_GAMEMSG,
-  K_SPECIAL1,
-  K_SPECIAL2,
-  K_SPECIAL3, 
-  K_SPECIAL4,
-  K_SPECIAL5,
-  K_SPECIAL6,
-/* not a key but the number of configurable keys */
-  K_NUM
-} GTetrinetKeys;
+#endif

@@ -1,3 +1,12 @@
+#include <gnome.h>
+#include <gconf/gconf-client.h>
+#include <dirent.h>
+
+#include "tetrinet.h"
+#include "misc.h"
+#include "sound.h"
+#include "config.h"
+
 extern void teamdialog_new (void);
 extern void connectdialog_new (void);
 extern void connectingdialog_destroy (void);

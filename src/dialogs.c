@@ -17,6 +17,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*
 #ifdef HAVE_CONFIG_H
 # include "../config.h"
 #endif
@@ -36,6 +37,9 @@
 #include "sound.h"
 #include "string.h"
 #include "partyline.h"
+*/
+
+#include "dialogs.h"
 
 extern GConfClient *gconf_client;
 extern GtkWidget *app;
@@ -83,7 +87,7 @@ void connectingdialog_new (void)
       return;
     }
     connectingdialog = gtk_dialog_new_with_buttons (_("Connect to server"),
-                                                    GTK_WINDOW (connectdialog),
+                                                    GTK_WINDOW (app),
                                                     GTK_DIALOG_MODAL,
                                                     GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                                     NULL);
@@ -93,7 +97,7 @@ void connectingdialog_new (void)
     gtk_box_pack_start (GTK_BOX (GTK_DIALOG(connectingdialog)->vbox),
                         progressbar, TRUE, TRUE, 0);
 
-    timeouttag = gtk_timeout_add (20, (GtkFunction)connectingdialog_timeout,
+    timeouttag = gtk_timeout_add (100, (GtkFunction)connectingdialog_timeout,
                                   NULL);
     g_signal_connect (G_OBJECT(connectingdialog), "response",
                         GTK_SIGNAL_FUNC(connectingdialog_button), NULL);
@@ -123,20 +127,24 @@ void teamdialog_destroy (void)
 void teamdialog_button (GtkWidget *button, gint response, gpointer data)
 {
     GtkEntry *entry = GTK_ENTRY (gnome_entry_gtk_entry (GNOME_ENTRY (data)));
-    gchar *aux;
+    gchar *aux, *buf;
 
     button = button; /* so we get no unused parameter warning */
   
     switch (response)
     {
-      case GTK_RESPONSE_OK :
-      {
+      case GTK_RESPONSE_OK:
         aux = g_locale_from_utf8 (gtk_entry_get_text (entry), -1, NULL, NULL, NULL);
         gconf_client_set_string (gconf_client, "/apps/gtetrinet/player/team",
                                  gtk_entry_get_text (entry), NULL);
-        tetrinet_changeteam (aux);
+        buf = tetrinet_changeteam (aux);
+        if (buf != NULL)
+        {
+          gtetrinet_inmessage (IN_TEAM, buf);
+          g_free (buf);
+        }
         g_free (aux);
-      }; break;
+        break;
     }
     
     teamdialog_destroy ();
@@ -246,6 +254,7 @@ void connectdialog_button (GtkDialog *dialog, gint button)
         if (g_utf8_strlen (nick, -1) > 0)
         {
           nick1 = g_locale_from_utf8 (nick, -1, NULL, NULL, NULL);
+          connectingdialog_new ();
           client_init (server1, nick1);
           g_free (nick1);
         }
@@ -270,7 +279,7 @@ void connectdialog_button (GtkDialog *dialog, gint button)
         g_free (nick);
         break;
     case GTK_RESPONSE_CANCEL:
-        gamemode = oldgamemode;
+        tetrinet_gamemode = oldgamemode;
         gtk_widget_destroy (connectdialog);
         break;
     }
@@ -295,14 +304,14 @@ void connectdialog_spectoggle (GtkWidget *widget)
 void connectdialog_originaltoggle (GtkWidget *widget)
 {
     if (GTK_TOGGLE_BUTTON(widget)-> active) {
-        gamemode = ORIGINAL;
+        tetrinet_gamemode = TETRINET_MODE_ORIGINAL;
     }
 }
 
 void connectdialog_tetrifasttoggle (GtkWidget *widget)
 {
     if (GTK_TOGGLE_BUTTON(widget)-> active) {
-        gamemode = TETRIFAST;
+        tetrinet_gamemode = TETRINET_MODE_TETRIFAST;
     }
 }
 
@@ -329,7 +338,7 @@ void connectdialog_new (void)
     connecting = TRUE;
 
     /* save some stuff */
-    oldgamemode = gamemode;
+    oldgamemode = tetrinet_gamemode;
 
     /* make dialog that asks for address/nickname */
     connectdialog = gtk_dialog_new_with_buttons (_("Connect to server"),
@@ -356,7 +365,6 @@ void connectdialog_new (void)
                  "activates_default", TRUE, NULL);
     gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(serveraddressentry))),
                         server);
-    gtk_widget_show (serveraddressentry);
     gtk_table_attach (GTK_TABLE(table2), serveraddressentry,
                       0, 1, 0, 1, GTK_FILL | GTK_EXPAND,
                       GTK_FILL | GTK_EXPAND, 0, 0);
@@ -364,30 +372,25 @@ void connectdialog_new (void)
     originalradio = gtk_radio_button_new_with_mnemonic (NULL, _("O_riginal"));
     gametypegroup = gtk_radio_button_get_group (GTK_RADIO_BUTTON(originalradio));
     tetrifastradio = gtk_radio_button_new_with_mnemonic (gametypegroup, _("Tetri_Fast"));
-    switch (gamemode) {
-    case ORIGINAL:
+    switch (tetrinet_gamemode) {
+    case TETRINET_MODE_ORIGINAL:
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(originalradio), TRUE);
         break;
-    case TETRIFAST:
+    case TETRINET_MODE_TETRIFAST:
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(tetrifastradio), TRUE);
         break;
     }
-    gtk_widget_show (originalradio);
-    gtk_widget_show (tetrifastradio);
     widget = gtk_hbox_new (FALSE, GNOME_PAD_SMALL);
     gtk_box_pack_start (GTK_BOX(widget), originalradio, 0, 0, 0);
     gtk_box_pack_start (GTK_BOX(widget), tetrifastradio, 0, 0, 0);
-    gtk_widget_show (widget);
     gtk_table_attach (GTK_TABLE(table2), widget,
                       0, 1, 1, 2, GTK_FILL, GTK_FILL, 0, 0);
 
     gtk_table_set_row_spacings (GTK_TABLE(table2), GNOME_PAD_SMALL);
     gtk_table_set_col_spacings (GTK_TABLE(table2), GNOME_PAD_SMALL);
     gtk_container_set_border_width (GTK_CONTAINER(table2), GNOME_PAD);
-    gtk_widget_show (table2);
     frame = gtk_frame_new (_("Server address"));
     gtk_container_add (GTK_CONTAINER(frame), table2);
-    gtk_widget_show (frame);
     gtk_table_attach (GTK_TABLE(table1), frame, 0, 2, 0, 1,
                       GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_EXPAND, 0, 0);
 
@@ -395,11 +398,9 @@ void connectdialog_new (void)
     table2 = gtk_table_new (1, 1, FALSE);
 
     spectatorcheck = gtk_check_button_new_with_mnemonic (_("Connect as a _spectator"));
-    gtk_widget_show (spectatorcheck);
     gtk_table_attach (GTK_TABLE(table2), spectatorcheck, 0, 2, 0, 1,
                       GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_EXPAND, 0, 0);
     passwordlabel = gtk_label_new_with_mnemonic (_("_Password:"));
-    gtk_widget_show (passwordlabel);
     gtk_table_attach (GTK_TABLE(table2), passwordlabel, 0, 1, 1, 2,
                       GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_EXPAND, 0, 0);
     passwordentry = gtk_entry_new ();
@@ -407,17 +408,14 @@ void connectdialog_new (void)
     gtk_entry_set_visibility (GTK_ENTRY(passwordentry), FALSE);
     g_object_set(G_OBJECT(passwordentry),
                  "activates_default", TRUE, NULL);
-    gtk_widget_show (passwordentry);
     gtk_table_attach (GTK_TABLE(table2), passwordentry, 1, 2, 1, 2,
                       GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_EXPAND, 0, 0);
 
     gtk_table_set_row_spacings (GTK_TABLE(table2), GNOME_PAD_SMALL);
     gtk_table_set_col_spacings (GTK_TABLE(table2), GNOME_PAD_SMALL);
     gtk_container_set_border_width (GTK_CONTAINER(table2), GNOME_PAD);
-    gtk_widget_show (table2);
     frame = gtk_frame_new (_("Spectate game"));
     gtk_container_add (GTK_CONTAINER(frame), table2);
-    gtk_widget_show (frame);
     gtk_table_attach (GTK_TABLE(table1), frame, 0, 1, 1, 2,
                       GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_EXPAND, 0, 0);
 
@@ -425,7 +423,6 @@ void connectdialog_new (void)
     table2 = gtk_table_new (1, 1, FALSE);
 
     widget = gtk_label_new_with_mnemonic (_("_Nick name:"));
-    gtk_widget_show (widget);
     gtk_table_attach (GTK_TABLE(table2), widget, 0, 1, 0, 1,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
     nicknameentry = gnome_entry_new ("Nickname");
@@ -436,11 +433,9 @@ void connectdialog_new (void)
     gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(nicknameentry))),
                         aux);
     g_free (aux);
-    gtk_widget_show (nicknameentry);
     gtk_table_attach (GTK_TABLE(table2), nicknameentry, 1, 2, 0, 1,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
     teamnamelabel = gtk_label_new_with_mnemonic (_("_Team name:"));
-    gtk_widget_show (teamnamelabel);
     gtk_table_attach (GTK_TABLE(table2), teamnamelabel, 0, 1, 1, 2,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
     teamnameentry = gnome_entry_new ("Teamname");
@@ -451,21 +446,17 @@ void connectdialog_new (void)
     gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(teamnameentry))),
                         aux);
     g_free (aux);
-    gtk_widget_show (teamnameentry);
     gtk_table_attach (GTK_TABLE(table2), teamnameentry, 1, 2, 1, 2,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
 
     gtk_table_set_row_spacings (GTK_TABLE(table2), GNOME_PAD_SMALL);
     gtk_table_set_col_spacings (GTK_TABLE(table2), GNOME_PAD_SMALL);
     gtk_container_set_border_width (GTK_CONTAINER(table2), GNOME_PAD);
-    gtk_widget_show (table2);
     frame = gtk_frame_new (_("Player information"));
     gtk_container_add (GTK_CONTAINER(frame), table2);
-    gtk_widget_show (frame);
     gtk_table_attach (GTK_TABLE(table1), frame, 1, 2, 1, 2,
                       GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_EXPAND, 0, 0);
 
-    gtk_widget_show (table1);
 
     gtk_container_set_border_width (GTK_CONTAINER (table1), GNOME_PAD_SMALL);
     gtk_box_pack_start (GTK_BOX (GTK_DIALOG(connectdialog)->vbox),
@@ -481,7 +472,7 @@ void connectdialog_new (void)
                         GTK_SIGNAL_FUNC(connectdialog_originaltoggle), NULL);
     g_signal_connect (G_OBJECT(tetrifastradio), "toggled",
                         GTK_SIGNAL_FUNC(connectdialog_tetrifasttoggle), NULL);
-    gtk_widget_show (connectdialog);
+    gtk_widget_show_all (connectdialog);
 }
 
 GtkWidget *prefdialog;

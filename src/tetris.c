@@ -19,300 +19,182 @@
 
 #include <string.h>
 
-#include "client.h"
 #include "tetrinet.h"
 #include "tetris.h"
-#include "fields.h"
-#include "misc.h"
-
-
-TETRISBLOCK b1[2] = {
-    {
-        {1,1,1,1},
-        {0,0,0,0},
-        {0,0,0,0},
-        {0,0,0,0}
-    }, {
-        {0,0,1,0},
-        {0,0,1,0},
-        {0,0,1,0},
-        {0,0,1,0}
-    }
-};
-
-TETRISBLOCK b2[1] = {
-    {
-        {0,2,2,0},
-        {0,2,2,0},
-        {0,0,0,0},
-        {0,0,0,0}
-    }
-};
-
-TETRISBLOCK b3[4] = {
-    {
-        {0,0,3,0},
-        {0,0,3,0},
-        {0,3,3,0},
-        {0,0,0,0}
-    }, {
-        {0,3,0,0},
-        {0,3,3,3},
-        {0,0,0,0},
-        {0,0,0,0}
-    }, {
-        {0,3,3,0},
-        {0,3,0,0},
-        {0,3,0,0},
-        {0,0,0,0}
-    }, {
-        {0,3,3,3},
-        {0,0,0,3},
-        {0,0,0,0},
-        {0,0,0,0}
-    }
-};
-
-TETRISBLOCK b4[4] = {
-    {
-        {0,4,0,0},
-        {0,4,0,0},
-        {0,4,4,0},
-        {0,0,0,0}
-    }, {
-        {0,4,4,4},
-        {0,4,0,0},
-        {0,0,0,0},
-        {0,0,0,0}
-    }, {
-        {0,4,4,0},
-        {0,0,4,0},
-        {0,0,4,0},
-        {0,0,0,0}
-    }, {
-        {0,0,0,4},
-        {0,4,4,4},
-        {0,0,0,0},
-        {0,0,0,0}
-    }
-};
-
-
-TETRISBLOCK b5[2] = {
-    {
-        {0,0,5,0},
-        {0,5,5,0},
-        {0,5,0,0},
-        {0,0,0,0}
-    }, {
-        {0,5,5,0},
-        {0,0,5,5},
-        {0,0,0,0},
-        {0,0,0,0}
-    }
-};
-
-TETRISBLOCK b6[2] = {
-    {
-        {0,1,0,0},
-        {0,1,1,0},
-        {0,0,1,0},
-        {0,0,0,0}
-    }, {
-        {0,0,1,1},
-        {0,1,1,0},
-        {0,0,0,0},
-        {0,0,0,0}
-    }
-};
-TETRISBLOCK b7[4] = {
-    {
-        {0,0,2,0},
-        {0,2,2,0},
-        {0,0,2,0},
-        {0,0,0,0}
-    }, {
-        {0,0,2,0},
-        {0,2,2,2},
-        {0,0,0,0},
-        {0,0,0,0}
-    }, {
-        {0,2,0,0},
-        {0,2,2,0},
-        {0,2,0,0},
-        {0,0,0,0}
-    }, {
-        {0,2,2,2},
-        {0,0,2,0},
-        {0,0,0,0},
-        {0,0,0,0}
-    }
-};
-static TETRISBLOCK *blocks[7] = { b1, b2, b3, b4, b5, b6, b7 };
-static int blockcount[7] = { 2, 1, 4, 4, 2, 2, 4 };
-
-static int blocknum = -1, blockorient; /* which block */
-static int blockx, blocky; /* current location of block */
 
 static int blockobstructed (FIELD field, int block, int orient, int bx, int by);
 static int obstructed (FIELD field, int x, int y);
 static void placeblock (FIELD field, int block, int orient, int bx, int by);
 
-void tetris_drawcurrentblock (void)
+FIELD *
+tetris_drawcurrentblock (TetrinetObject *obj)
 {
-    FIELD field;
-    copyfield (field, fields[playernum]);
-    if (blocknum >= 0)
-        placeblock (field, blocknum, blockorient, blockx, blocky);
-    fields_drawfield (playerfield(playernum), field);
+    FIELD *field;
+
+    field = (FIELD*) malloc (sizeof (FIELD));
+    
+    tetris_copyfield (*field, obj->fields[obj->playernum]);
+    if (obj->current_block_num >= 0)
+      placeblock (*field, obj->current_block_num, obj->current_block_orient, obj->current_block_x, obj->current_block_y);
+
+    return field;
 }
 
-int tetris_makeblock (int block, int orient)
+int
+tetris_makeblock (TetrinetObject *obj, int block, int orient)
 {
-    blocknum = block;
-    blockorient = orient;
-    blockx = FIELDWIDTH/2-2;
-    blocky = 0;
+    obj->current_block_num = block;
+    obj->current_block_orient = orient;
+    obj->current_block_x = TETRINET_FIELDWIDTH/2-2;
+    obj->current_block_y = 0;
 
     if (block >= 0 &&
-        blockobstructed (fields[playernum], blocknum,
-                         blockorient, blockx, blocky))
+        blockobstructed (obj->fields[obj->playernum], obj->current_block_num,
+                         obj->current_block_orient, obj->current_block_x, obj->current_block_y))
     {
         /* player is dead */
-        tetrinet_playerlost ();
-        blocknum = -1;
-        return 1;
+        tetrinet_playerlost (obj);
+        obj->current_block_num = -1;
+        return TRUE;
     }
-    else return 0;
-}
-
-int tetris_randomorient (int block)
-{
-    return randomnum (blockcount[block]);
-}
-
-P_TETRISBLOCK tetris_getblock (int block, int orient)
-{
-    return blocks[block][orient];
+    else
+      return FALSE;
 }
 
 /* returns -1 if block solidifies, 0 otherwise */
-int tetris_blockdown (void)
+int
+tetris_blockdown (TetrinetObject *obj)
 {
-    if (blocknum < 0) return 0;
+    if (obj->current_block_num < 0) return 0;
     /* move the block down one */
-    if (blockobstructed (fields[playernum], blocknum,
-                         blockorient, blockx, blocky+1))
+    if (blockobstructed (obj->fields[obj->playernum], obj->current_block_num,
+                         obj->current_block_orient, obj->current_block_x, obj->current_block_y + 1))
     {
         /* cant move down */
 #ifdef DEBUG
-        printf ("blockobstructed: %d %d\n", blockx, blocky);
+        printf ("blockobstructed: %d %d\n", obj->current_block_x, obj->current_block_y);
 #endif
         return -1;
     }
     else {
-        blocky ++;
+        obj->current_block_y ++;
         return 0;
     }
 }
 
-void tetris_blockmove (int dir)
+void
+tetris_blockmove (TetrinetObject *obj, int dir)
 {
-    if (blocknum < 0) return;
-    if (blockobstructed (fields[playernum], blocknum,
-                         blockorient, blockx+dir, blocky))
+    if (obj->current_block_num < 0) return;
+    if (blockobstructed (obj->fields[obj->playernum], obj->current_block_num,
+                         obj->current_block_orient, obj->current_block_x + dir, obj->current_block_y))
     /* do nothing */;
-    else blockx += dir;
+    else
+      obj->current_block_x += dir;
 }
 
-void tetris_blockrotate (int dir)
+void
+tetris_blockrotate (TetrinetObject *obj, int dir)
 {
-    int neworient = blockorient + dir;
-    if (blocknum < 0) return;
-    if (neworient >= blockcount[blocknum]) neworient = 0;
-    if (neworient < 0) neworient = blockcount[blocknum] - 1;
-    switch (blockobstructed (fields[playernum], blocknum,
-                             neworient, blockx, blocky))
+    int neworient = obj->current_block_orient + dir;
+    
+    if (obj->current_block_num < 0)
+      return;
+    
+    if (neworient >= tetris_blockcount[obj->current_block_num])
+      neworient = 0;
+    
+    if (neworient < 0)
+      neworient = tetris_blockcount[obj->current_block_num] - 1;
+    
+    switch (blockobstructed (obj->fields[obj->playernum], obj->current_block_num,
+                             neworient, obj->current_block_x, obj->current_block_y))
     {
     case 1: return; /* cant rotate if obstructed by blocks */
     case 2: /* obstructed by sides - move block away if possible */
+    {
+      int shifts[4] = {1, -1, 2, -2};
+      int i;
+      
+      for (i = 0; i < 4; i ++) {
+        if (!blockobstructed (obj->fields[obj->playernum], obj->current_block_num,
+                              neworient, obj->current_block_x + shifts[i],
+                              obj->current_block_y))
         {
-            int shifts[4] = {1, -1, 2, -2};
-            int i;
-            for (i = 0; i < 4; i ++) {
-                if (!blockobstructed (fields[playernum], blocknum,
-                                      neworient, blockx+shifts[i],
-                                      blocky))
-                {
-                    blockx += shifts[i];
-                    goto end;
-                }
-            }
-            return; /* unsuccessful */
+          obj->current_block_x += shifts[i];
+          goto end;
         }
+      }
+      return; /* unsuccessful */
+    }
     }
 end:
-    blockorient = neworient;
+    obj->current_block_orient = neworient;
 }
 
-void tetris_blockdrop (void)
+void
+tetris_blockdrop (TetrinetObject *obj)
 {
-    if (blocknum < 0) return;
-    while (tetris_blockdown () == 0);
+    if (obj->current_block_num < 0) return;
+    while (tetris_blockdown (obj) == 0);
 }
 
-void tetris_addlines (int count, int type)
+void
+tetris_addlines (TetrinetObject *obj, int count, int type)
 {
     int x, y, i;
     FIELD field;
-    copyfield (field, fields[playernum]);
+    
+    tetris_copyfield (field, obj->fields[obj->playernum]);
     for (i = 0; i < count; i ++) {
         /* check top row */
-        for (x = 0; x < FIELDWIDTH; x ++) {
+        for (x = 0; x < TETRINET_FIELDWIDTH; x ++) {
             if (field[0][x]) {
                 /* player is dead */
-                tetrinet_playerlost ();
+                tetrinet_playerlost (obj);
                 return;
             }
         }
         /* move everything up one */
-        for (y = 0; y < FIELDHEIGHT-1; y ++) {
-            for (x = 0; x < FIELDWIDTH; x ++)
+        for (y = 0; y < TETRINET_FIELDHEIGHT - 1; y ++) {
+            for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
                 field[y][x] = field[y+1][x];
         }
         /* generate a random line with spaces in it */
         switch (type) {
         case 1: /* addline lines */
             /* ### This is how the original tetrinet seems to do an add line */
-            for (x = 0; x < FIELDWIDTH; x ++)
-                field[FIELDHEIGHT-1][x] = randomnum(6);
-            field[FIELDHEIGHT-1][randomnum(FIELDWIDTH)] = 0;
+            for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
+                field[TETRINET_FIELDHEIGHT-1][x] = tetris_randomnum (6);
+            field[TETRINET_FIELDHEIGHT-1][tetris_randomnum (TETRINET_FIELDWIDTH)] = 0;
             /* ### Corrected by Pihvi */
             break;
         case 2: /* classicmode lines */
             /* fill up the line */
-            for (x = 0; x < FIELDWIDTH; x ++)
-                field[FIELDHEIGHT-1][x] = randomnum(5) + 1;
+            for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
+                field[TETRINET_FIELDHEIGHT-1][x] = tetris_randomnum(5) + 1;
             /* add a single space */
-            field[FIELDHEIGHT-1][randomnum(FIELDWIDTH)] = 0;
+            field[TETRINET_FIELDHEIGHT-1][tetris_randomnum(TETRINET_FIELDWIDTH)] = 0;
             break;
         }
     }
-    tetrinet_updatefield (field);
+    tetrinet_updatefield (obj, field);
 }
 
 /* this function removes full lines */
-int tetris_removelines (char *specials)
+int
+tetris_removelines (TetrinetObject *obj, char *specials)
 {
     int x, y, o, c = 0, i;
     FIELD field;
-    if (!playing) return 0;
-    copyfield (field, fields[playernum]);
+    
+    if (!obj->playing) return 0;
+    tetris_copyfield (field, obj->fields[obj->playernum]);
     /* remove full lines */
-    for (y = 0; y < FIELDHEIGHT; y ++) {
+    for (y = 0; y < TETRINET_FIELDHEIGHT; y ++) {
         o = 0;
         /* count holes */
-        for (x = 0; x < FIELDWIDTH; x ++)
+        for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
             if (field[y][x] == 0) o ++;
         if (o) continue; /* if holes */
         /* no holes */
@@ -320,50 +202,74 @@ int tetris_removelines (char *specials)
         c ++;
         /* grab specials */
         if (specials)
-            for (x = 0; x < FIELDWIDTH; x ++)
+            for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
                 if (field[y][x] > 5)
                     *specials++ = field[y][x];
         /* move field down */
         for (i = y-1; i >= 0; i --)
-            for (x = 0; x < FIELDWIDTH; x ++)
+            for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
                 field[i+1][x] = field[i][x];
         /* clear top line */
-        for (x = 0; x < FIELDWIDTH; x ++)
+        for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
             field[0][x] = 0;
     }
     if (specials) *specials = 0; /* null terminate */
-    if (c) tetrinet_updatefield (field);
+    if (c) tetrinet_updatefield (obj, field);
     return c;
 }
 
-void tetris_solidify (void)
+void
+tetris_solidify (TetrinetObject *obj)
 {
     FIELD field;
-    copyfield (field, fields[playernum]);
-    if (blocknum < 0) return;
-    if (blockobstructed (field, blocknum, blockorient, blockx, blocky)) {
+    
+    tetris_copyfield (field, obj->fields[obj->playernum]);
+    
+    if (obj->current_block_num < 0)
+      return;
+    
+    if (blockobstructed (field, obj->current_block_num, obj->current_block_orient, obj->current_block_x, obj->current_block_y)) {
         /* move block up until we get a free spot */
-        for (blocky --; blocky >= 0; blocky --)
-            if (!blockobstructed (field, blocknum, blockorient, blockx, blocky))
+        for (obj->current_block_y --; obj->current_block_y >= 0; obj->current_block_y --)
+            if (!blockobstructed (field, obj->current_block_num, obj->current_block_orient, obj->current_block_x, obj->current_block_y))
             {
-                placeblock (field, blocknum, blockorient, blockx, blocky);
+                placeblock (field, obj->current_block_num, obj->current_block_orient, obj->current_block_x, obj->current_block_y);
                 break;
             }
         if (blocky < 0) {
             /* no space - player has lost */
-            tetrinet_playerlost ();
-            blocknum = -1;
+            tetrinet_playerlost (obj);
+            obj->current_block_num = -1;
             return;
         }
     }
     else {
-        placeblock (field, blocknum, blockorient, blockx, blocky);
+        placeblock (field, obj->current_block_num, obj->current_block_orient, obj->current_block_x, obj->current_block_y);
     }
-    tetrinet_updatefield (field);
-    blocknum = -1;
+    tetrinet_updatefield (obj, field);
+    obj->current_block_num = -1;
 }
 
-static int blockobstructed (FIELD field, int block, int orient, int bx, int by)
+void
+tetris_copyfield (FIELD dest, FIELD src)
+{
+    memcpy ((void *)dest, (void *)src, TETRINET_FIELDHEIGHT * TETRINET_FIELDWIDTH);
+}
+
+int
+tetris_randomorient (int block)
+{
+    return tetris_randomnum (tetris_blockcount[block]);
+}
+
+TETRISBLOCK_P
+tetris_getblock (int block, int orient)
+{
+    return tetris_blocks[block][orient];
+}
+
+static int
+blockobstructed (FIELD field, int block, int orient, int bx, int by)
 {
     int x, y, side = 0;
     for (y = 0; y < 4; y ++)
@@ -378,27 +284,33 @@ static int blockobstructed (FIELD field, int block, int orient, int bx, int by)
     return side;
 }
 
-static int obstructed (FIELD field, int x, int y)
+static int
+obstructed (FIELD field, int x, int y)
 {
     if (x < 0) return 2;
-    if (x >= FIELDWIDTH) return 2;
+    if (x >= TETRINET_FIELDWIDTH) return 2;
     if (y < 0) return 1;
-    if (y >= FIELDHEIGHT) return 1;
+    if (y >= TETRINET_FIELDHEIGHT) return 1;
     if (field[y][x]) return 1;
     return 0;
 }
 
-static void placeblock (FIELD field, int block, int orient, int bx, int by)
+static void
+placeblock (FIELD field, int block, int orient, int bx, int by)
 {
     int x, y;
     for (y = 0; y < 4; y ++)
         for (x = 0; x < 4; x ++) {
-            if (blocks[block][orient][y][x])
-                field[y+by][x+bx] = blocks[block][orient][y][x];
+            if (tetris_blocks[block][orient][y][x])
+                field[y+by][x+bx] = tetris_blocks[block][orient][y][x];
         }
 }
 
-void copyfield (FIELD dest, FIELD src)
+/* returns a random number in the range 0 to n-1 --
+ * Note both n==0 and n==1 always return 0 */
+int
+tetris_randomnum (int n)
 {
-    memcpy ((void *)dest, (void *)src, FIELDHEIGHT*FIELDWIDTH);
+    return (float)n*rand()/(RAND_MAX+1.0);
 }
+

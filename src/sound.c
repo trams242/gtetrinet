@@ -32,9 +32,9 @@ extern char **environ;
 
 int soundenable, midienable;
 
-char soundfiles[S_NUM][1024];
-char midifile[1024];
-char midicmd[1024];
+gchar *soundfiles[S_NUM];
+gchar *midifile;
+gchar *midicmd;
 
 #ifdef HAVE_ESD
 

@@ -49,13 +49,6 @@ void leftlabel_set (GtkWidget *align, char *str)
     g_free (aux);
 }
 
-/* returns a random number in the range 0 to n-1 --
- * Note both n==0 and n==1 always return 0 */
-int randomnum (int n)
-{
-    return (float)n*rand()/(RAND_MAX+1.0);
-}
-
 void fdreadline (int fd, char *buf)
 {
     int c = 0;

@@ -17,6 +17,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*
 #ifdef HAVE_CONFIG_H
 # include "../config.h"
 #endif
@@ -32,6 +33,9 @@
 #include "partyline.h"
 #include "misc.h"
 #include "commands.h"
+*/
+
+#include "partyline.h"
 
 int timestampsenable;
 gboolean list_enabled;
@@ -55,6 +59,11 @@ int plh_start = 0, plh_end = 0, plh_cur = 0;
 /* function prototypes for callbacks */
 static void textentry (GtkWidget *widget);
 static gint entrykey (GtkWidget *widget, GdkEventKey *key);
+static void partyline_update (int now);
+static void partyline_update_join (char *name);
+static void partyline_update_team (char *name, char *team);
+static void partyline_update_leave (char *name);
+static void playerlist_update (void);
 void channel_activated (GtkTreeView *treeview);
 
 GtkWidget *partyline_page_new (void)
@@ -686,3 +695,242 @@ void partyline_show_channel_list (gboolean show)
   else
     gtk_widget_hide (channel_list);
 }
+
+void plinemsg (const char *name, const char *text) // Interface function
+{
+    char buf[1024];
+    g_snprintf (buf, sizeof(buf), "%c<%s%c%c>%c %s",
+                TETRI_TB_BOLD, name,
+                TETRI_TB_RESET, TETRI_TB_BOLD, TETRI_TB_BOLD, text);
+    partyline_text (buf);
+}
+
+void plinesmsg (const char *name, const char *text) // Interface function
+{
+    char buf[1024];
+    g_snprintf (buf, sizeof(buf), "%c%c<%s%c%c%c>%c %s",
+                TETRI_TB_C_BRIGHT_BLUE, TETRI_TB_BOLD,
+                name,
+                TETRI_TB_RESET,
+                TETRI_TB_C_BRIGHT_BLUE, TETRI_TB_BOLD, TETRI_TB_BOLD, text);
+    partyline_text (buf);
+}
+
+void plineact (const char *name, const char *text) // Interface function
+{
+    char buf[1024];
+    g_snprintf (buf, sizeof(buf), "%c* %c%s%c%c %s",
+                TETRI_TB_C_PURPLE, TETRI_TB_BOLD, name,
+                TETRI_TB_RESET, TETRI_TB_C_PURPLE, text);
+    partyline_text (buf);
+}
+
+void plinesact (const char *name, const char *text) // Interface function
+{
+    char buf[1024];
+    g_snprintf (buf, sizeof(buf), "%c* %c%s%c%c %s",
+                TETRI_TB_C_BRIGHT_BLUE, TETRI_TB_BOLD,
+                name,
+                TETRI_TB_RESET, TETRI_TB_C_BRIGHT_BLUE, text);
+    partyline_text (buf);
+}
+
+/* these functions combines consecutive playerjoin and team messages */
+char pjoins[16][128];
+char pteams[16][128];
+int pcount = 0;
+char pleaves[16][128];
+int plcount = 0;
+
+int putimeout = 0;
+
+void partylineupdate (int now)
+{
+    if (putimeout) gtk_timeout_remove (putimeout);
+    if (now)
+        partylineupdate_timeout ();
+    else
+        putimeout = gtk_timeout_add (PARTYLINEDELAY1, (GtkFunction)partylineupdate_timeout,
+                                     NULL);
+}
+
+int partylineupdate_timeout (void) // Interface function
+{
+    int i, j, c;
+    char buf[1024], buf2[1024], team[128];
+    int f[16];
+
+    if (plcount) {
+        g_snprintf(buf, sizeof(buf), "%c*** ", TETRI_TB_C_DARK_GREEN);
+        for (i = 0; i < plcount; i++) {
+            g_snprintf (buf2, sizeof(buf2), "%c%s%c%c, ",
+                        TETRI_TB_BOLD, pleaves[i],
+                        TETRI_TB_RESET, TETRI_TB_C_DARK_GREEN);
+            GTET_O_STRCAT (buf, buf2);
+        }
+        buf[strlen(buf)-2] = 0; /* remove ", " from end of string */
+        if (plcount == 1) GTET_O_STRCAT (buf, _(" has left the game"));
+        else GTET_O_STRCAT (buf, _(" have left the game"));
+        plcount = 0;
+        partyline_text (buf);
+    }
+    if (pcount) {
+        g_snprintf(buf, sizeof(buf), "%c*** ", TETRI_TB_C_DARK_GREEN);
+        for (i = 0; i < pcount; i++) {
+            g_snprintf (buf2, sizeof(buf2), "%c%s%c%c, ",
+                        TETRI_TB_BOLD, pjoins[i],
+                        TETRI_TB_RESET, TETRI_TB_C_DARK_GREEN);
+            GTET_O_STRCAT (buf, buf2);
+        }
+        buf[strlen(buf)-2] = 0;
+        if (pcount == 1) GTET_O_STRCAT (buf, _(" has joined the game"));
+        else GTET_O_STRCAT (buf, _(" have joined the game"));
+        partyline_text (buf);
+
+        for (i = 0; i < pcount; i ++) f[i] = 1;
+        for (i = 0; i < pcount; i ++) if (f[i]) {
+            GTET_O_STRCPY (team, pteams[i]);
+            g_snprintf (buf, sizeof(buf), "%c*** %c%s%c%c",
+                        TETRI_TB_C_DARK_RED, TETRI_TB_BOLD,
+                        pjoins[i],
+                        TETRI_TB_RESET, TETRI_TB_C_DARK_RED);
+            c = 1;
+            for (j = i+1; j < pcount; j ++) {
+                if (strcmp (team, pteams[j]) == 0) {
+                    g_snprintf (buf2, sizeof(buf2), ", %c%s%c%c",
+                                TETRI_TB_BOLD, pjoins[j],
+                                TETRI_TB_RESET, TETRI_TB_C_DARK_RED);
+                    GTET_O_STRCAT (buf, buf2);
+                    f[j] = 0;
+                    c ++;
+                }
+            }
+            if (0) {}
+            else if ((c == 1) &&  team[0])
+              partyline_fmt(_("%s is on team %c%s"),
+                            buf, TETRI_TB_BOLD, team);
+            else if ((c == 1) && !team[0])
+              partyline_fmt(_("%s is alone"), buf);
+            else if ((c != 1) &&  team[0])
+              partyline_fmt(_("%s are on team %c%s"),
+                            buf, TETRI_TB_BOLD, team);
+            else if ((c != 1) && !team[0])
+              partyline_fmt(_("%s are alone"), buf);
+        }
+        pcount = 0;
+    }
+    
+    putimeout = 0;
+    return FALSE;
+}
+
+void partyline_update (int now) // Interface function
+{
+    if (putimeout) gtk_timeout_remove (putimeout);
+    if (now)
+        partyline_update_timeout ();
+    else
+        putimeout = gtk_timeout_add (PARTYLINEDELAY1, (GtkFunction) partyline_update_timeout,
+                                     NULL);
+}
+
+void partyline_update_join (char *name) // Interface function
+{
+    int i;
+    if (!connected) return;
+    for (i = 0; i < pcount; i ++) if (strcmp(pjoins[i], name) == 0) return;
+    GTET_O_STRCPY (pjoins[pcount], name);
+    pteams[pcount][0] = 0;
+    pcount ++;
+    partyline_update (0);
+}
+
+void partyline_update_team (char *name, char *team) // Interface function
+{
+    int i;
+    if (!connected) return;
+    for (i = 0; i < pcount; i ++)
+        if (strcmp (pjoins[i], name) == 0) break;
+    if (i == pcount) {
+        char buf[1024];
+        /* player did not just join - display normally */
+        if (team[0])
+            g_snprintf (buf, sizeof(buf),
+                        _("%c*** %c%s%c%c is now on team %c%s"),
+                        TETRI_TB_C_DARK_RED, TETRI_TB_BOLD,
+                        name,
+                        TETRI_TB_RESET, TETRI_TB_C_DARK_RED,
+                        TETRI_TB_BOLD, team);
+        else
+            g_snprintf (buf, sizeof(buf),
+                        _("%c*** %c%s%c%c is now alone"),
+                        TETRI_TB_C_DARK_RED, TETRI_TB_BOLD,
+                        name,
+                        TETRI_TB_RESET, TETRI_TB_C_DARK_RED);
+        partyline_text (buf);
+    }
+    GTET_O_STRCPY (pteams[i], team);
+    partyline_update (0);
+}
+
+void partyline_update_leave (char *name) // Interface function
+{
+    if (!connected) return;
+    GTET_O_STRCPY (pleaves[plcount], name);
+    plcount ++;
+    partyline_update (0);
+}
+
+void playerlist_update (void) // Interface function
+{
+    int i, sn, n = 0;
+    char *pnames[6], *teams[6], *specs[128];
+    int pnums[6];
+    for (i = 1; i <= 6; i ++) {
+        if (playernames[i][0]) {
+            pnums[n] = i;
+            pnames[n] = playernames[i];
+            teams[n] = teamnames[i];
+            n ++;
+        }
+    }
+    for (sn = 0; sn < spectatorcount; sn++) specs[sn] = spectatorlist[sn];
+    partyline_playerlist (pnums, pnames, teams, n, specs, sn);
+}
+
+int mutimeout = 0;
+
+/*
+ this function exists to prevent the flood of moderator change messages
+ that occur on connecting to a server, by combining them to a single line
+ */
+int moderatorupdate_timeout (void) // Interface function
+{
+    if (moderatornum) {
+        char buf[256];
+        g_snprintf (buf, sizeof(buf),
+                    _("%c*** %c%s%c%c is the moderator"),
+                    TETRI_TB_C_BRIGHT_RED, TETRI_TB_BOLD,
+                    playernames[moderatornum],
+                    TETRI_TB_RESET, TETRI_TB_C_BRIGHT_RED);
+        partyline_text (buf);
+    }
+    mutimeout = 0;
+    return FALSE;
+}
+
+void moderatorupdate (int now) // Interface function
+{
+    if (now) {
+        if (mutimeout) {
+            gtk_timeout_remove (mutimeout);
+            moderatorupdate_timeout ();
+        }
+    }
+    else {
+        if (mutimeout)
+            gtk_timeout_remove (mutimeout);
+        mutimeout = gtk_timeout_add (PARTYLINEDELAY2, (GtkFunction)moderatorupdate_timeout, NULL);
+    }
+}
+

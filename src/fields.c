@@ -16,7 +16,7 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
+/*
 #ifdef HAVE_CONFIG_H
 # include "../config.h"
 #endif
@@ -33,6 +33,9 @@
 #include "misc.h"
 #include "gtetrinet.h"
 #include "string.h"
+*/
+
+#include "fields.h"
 
 #define BLOCKSIZE bsize
 #define SMALLBLOCKSIZE (BLOCKSIZE/2)
@@ -49,7 +52,7 @@ static gint fields_specials_expose (GtkWidget *widget);
 
 static void fields_refreshfield (int field);
 static void fields_drawblock (int field, int x, int y, char block);
-
+static void fields_setlabel (int field, char *name, char *team, int num);
 static void gmsginput_activate (void);
 
 static GdkPixmap *blockpix;
@@ -250,7 +253,7 @@ GtkWidget *fields_page_contents (void)
     box = gtk_hbox_new (FALSE, 0);
     speciallabel = gtk_label_new ("");
     gtk_widget_show (speciallabel);
-    fields_setspeciallabel (NULL);
+    fields_setspeciallabel (-1);
     align = gtk_alignment_new (1.0, 0.0, 1.0, 1.0);
     gtk_container_add (GTK_CONTAINER (align), speciallabel);
     gtk_box_pack_start (GTK_BOX(box), align, TRUE, TRUE, 0);
@@ -294,8 +297,7 @@ GtkWidget *fields_page_contents (void)
 
     /* game messages */
     table2 = gtk_table_new (1, 2, FALSE);
-    gmsgtext = gtk_text_view_new_with_buffer(gtk_text_buffer_new(tag_table));
-    gtk_widget_set_size_request (gmsgtext, -1, 48);
+    gmsgtext = gtk_text_view_new_with_buffer (gtk_text_buffer_new (tag_table));
     GTK_WIDGET_UNSET_FLAGS (gmsgtext, GTK_CAN_FOCUS);
     scroll = gtk_scrolled_window_new (NULL, NULL);
     gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(scroll),
@@ -303,7 +305,7 @@ GtkWidget *fields_page_contents (void)
                                     GTK_POLICY_AUTOMATIC);
     gtk_container_add (GTK_CONTAINER(scroll), gmsgtext);
     gtk_table_attach (GTK_TABLE(table2), scroll, 0, 1, 0, 1,
-                      GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_SHRINK,
+                      GTK_FILL | GTK_EXPAND, GTK_FILL | GTK_EXPAND,
                       0, 0);
     gmsginput = gtk_entry_new ();
     gtk_entry_set_max_length (GTK_ENTRY (gmsginput), 128);
@@ -312,7 +314,6 @@ GtkWidget *fields_page_contents (void)
                         GTK_SIGNAL_FUNC(gmsginput_activate), NULL);
     gtk_table_attach (GTK_TABLE(table2), gmsginput, 0, 1, 1, 2,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
-    gtk_widget_set_size_request (table2, -1, 48);
     
     align = gtk_alignment_new (0.5, 0.5, 0.0, 0.0);
     gtk_container_add (GTK_CONTAINER (align), table);
@@ -320,8 +321,6 @@ GtkWidget *fields_page_contents (void)
     align = gtk_alignment_new (0.5, 0.5, 1.0, 1.0);
     gtk_container_add (GTK_CONTAINER (align), table2);
     gtk_box_pack_start (GTK_BOX (vbox), align, TRUE, TRUE, 0);
-/*    gtk_table_attach (GTK_TABLE(table), table2, 0, 5, 3, 4,
-                      GTK_FILL | GTK_EXPAND, 0, 0, 0);*/
 
     gtk_widget_show_all (vbox);
 
@@ -402,7 +401,7 @@ void fields_drawblock (int field, int x, int y, char block)
                        blocksize, blocksize);
 }
 
-void fields_setlabel (int field, char *name, char *team, int num)
+static void fields_setlabel (int field, char *name, char *team, int num)
 {
     char buf[11];
     gchar *name_utf8, *team_utf8;
@@ -443,16 +442,6 @@ void fields_setlabel (int field, char *name, char *team, int num)
             g_free (team_utf8);
         }
         g_free (name_utf8);
-    }
-}
-
-void fields_setspeciallabel (char *label)
-{
-    if (label == NULL) {
-        gtk_label_set_text (GTK_LABEL(speciallabel), _("Specials:"));
-    }
-    else {
-        gtk_label_set_text (GTK_LABEL(speciallabel), label);
     }
 }
 
@@ -652,3 +641,47 @@ const char *fields_gmsginputtext (void)
 {
     return gtk_entry_get_text (GTK_ENTRY(gmsginput));
 }
+
+void fields_redraw (void) // Interface function
+{
+    int i;
+
+    fieldslabelupdate ();
+    if (ingame) for (i = 1; i <= 6; i ++)
+        fields_drawfield (playerfield(i), fields[i]);
+}
+
+void fields_setspeciallabel (int sb) // Interface function
+{
+    int sbnum;
+    
+    if (sb == -1) {
+      gtk_label_set_text (GTK_LABEL(speciallabel), _("No special blocks"));
+    }
+    else {
+      for (sbnum = 0; tetrinet_sbinfo[sbnum].id; sbnum ++)
+        if (tetrinet_sbinfo[sbnum].block == sb) break;
+      gtk_label_set_text (GTK_LABEL(speciallabel), tetrinet_sbinfo[sbnum].info);
+    }
+
+}
+
+void fields_labelupdate (void) // Interface function
+{
+    int i;
+    for (i = 1; i <= 6; i ++) {
+        if (playernames[i][0] == 0)
+            fields_setlabel (playerfield(i), NULL, NULL, 0);
+        else
+            fields_setlabel (playerfield(i), playernames[i], teamnames[i], i);
+    }
+}
+
+int
+fields_playerfield (int p)
+{
+    if (p < bigfieldnum) return p;
+    else if (p == bigfieldnum) return 0;
+    else return p - 1;
+}
+

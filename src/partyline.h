@@ -1,4 +1,10 @@
-#include <gtk/gtk.h>
+#ifndef __GTETRINET_PARTYLINE_H__
+#define __GTETRINET_PARTYLINE_H__
+
+#include <gnome.h>
+#include <gdk/gdkkeysyms.h>
+
+#include "config.h"
 
 extern int timestampsenable;
 extern gboolean list_enabled;
@@ -19,3 +25,9 @@ extern void partyline_clear_list_channel (void);
 extern void partyline_joining_channel (const gchar *channel);
 extern void stop_list (void);
 extern void partyline_show_channel_list (gboolean);
+extern void plinemsg (const TetrinetMessage *);
+extern void plinesmsg (const TetrinetMessage *);
+extern void plineact (const TetrinetMessage *);
+extern void plinesact (const TetrinetMessage *);
+
+#endif

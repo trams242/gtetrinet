@@ -1,3 +1,6 @@
+#ifndef __TETRINET_MISC_H__
+#define __TETRINET_MISC_H__
+
 #include <gtk/gtk.h>
 
 extern GtkTextTagTable *tag_table;
@@ -91,3 +94,5 @@ extern char *nocolor (char *str);
 
 #define TETRI_TB_C_END_OFFSET    25 /* highest color value */
 #define TETRI_TB_END_OFFSET      31 /* highest value - must be less than 32 */
+
+#endif

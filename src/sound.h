@@ -15,9 +15,9 @@
 
 extern int soundenable, midienable;
 
-extern char soundfiles[S_NUM][1024];
-extern char midifile[1024];
-extern char midicmd[1024];
+extern gchar *soundfiles[S_NUM];
+extern gchar *midifile;
+extern gchar *midicmd;
 
 void sound_cache (void);
 void sound_playsound (int id);
