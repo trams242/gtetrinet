@@ -1,14 +1,11 @@
 #ifndef __LIBTETRINET_TETRIS_H__
 #define __LIBTETRINET_TETRIS_H__
 
-#define TETRINET_FIELDWIDTH 12
-#define TETRINET_FIELDHEIGHT 22
+#include "tetrinet.h"
 
-typedef char TETRINET_FIELD[FIELDHEIGHT][FIELDWIDTH];
-typedef char TETRISBLOCK[4][4];
-typedef char (*TETRISBLOCK_P)[4];
+typedef char (*TETRIS_BLOCK_P)[4];
 
-TETRISBLOCK tetris_block1[2] = {
+TETRIS_BLOCK tetris_block1[2] = {
     {
         {1,1,1,1},
         {0,0,0,0},
@@ -22,7 +19,7 @@ TETRISBLOCK tetris_block1[2] = {
     }
 };
 
-TETRISBLOCK tetris_block2[1] = {
+TETRIS_BLOCK tetris_block2[1] = {
     {
         {0,2,2,0},
         {0,2,2,0},
@@ -31,7 +28,7 @@ TETRISBLOCK tetris_block2[1] = {
     }
 };
 
-TETRISBLOCK tetris_block3[4] = {
+TETRIS_BLOCK tetris_block3[4] = {
     {
         {0,0,3,0},
         {0,0,3,0},
@@ -55,7 +52,7 @@ TETRISBLOCK tetris_block3[4] = {
     }
 };
 
-TETRISBLOCK tetris_block4[4] = {
+TETRIS_BLOCK tetris_block4[4] = {
     {
         {0,4,0,0},
         {0,4,0,0},
@@ -79,7 +76,7 @@ TETRISBLOCK tetris_block4[4] = {
     }
 };
 
-TETRISBLOCK tetris_block5[2] = {
+TETRIS_BLOCK tetris_block5[2] = {
     {
         {0,0,5,0},
         {0,5,5,0},
@@ -93,7 +90,7 @@ TETRISBLOCK tetris_block5[2] = {
     }
 };
 
-TETRISBLOCK tetris_block6[2] = {
+TETRIS_BLOCK tetris_block6[2] = {
     {
         {0,1,0,0},
         {0,1,1,0},
@@ -107,7 +104,7 @@ TETRISBLOCK tetris_block6[2] = {
     }
 };
 
-TETRISBLOCK tetris_block7[4] = {
+TETRIS_BLOCK tetris_block7[4] = {
     {
         {0,0,2,0},
         {0,2,2,0},
@@ -131,7 +128,7 @@ TETRISBLOCK tetris_block7[4] = {
     }
 };
 
-static TETRISBLOCK *tetris_blocks[7] =
+static TETRIS_BLOCK *tetris_blocks[7] =
 {
   tetris_block1,
   tetris_block2,
@@ -154,9 +151,9 @@ extern void tetris_solidify (TetrinetObject *obj);
 extern void tetris_addlines (TetrinetObject *obj, int count, int type);
 extern int tetris_removelines (TetrinetObject *obj, char *specials);
 
-extern void tetris_copyfield (FIELD dest, FIELD src);
+extern void tetris_copyfield (TETRINET_FIELD dest, TETRINET_FIELD src);
 extern int tetris_randomorient (int block);
-extern TETRISBLOCK_P tetris_getblock (int block, int orient);
+extern TETRIS_BLOCK_P tetris_getblock (int block, int orient);
 extern int tetris_randomnum (int n);
 
 #endif

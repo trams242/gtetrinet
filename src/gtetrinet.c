@@ -81,6 +81,11 @@ static void show_stop_button (void);
 static void show_connect_button (void);
 static void show_disconnect_button (void);
 
+int gtetrinet_timeout (void);
+void gtetrinet_draw_current_block (void);
+void gtetrinet_settimeout (int);
+void gtetrinet_nextblock (void);
+
 static GIOChannel *io_channel;
 static guint source;
 static gboolean io_channel_cb (GIOChannel *source, GIOCondition condition);
@@ -97,8 +102,8 @@ GtkWidget *app;
 
 char *option_connect = 0, *option_nick = 0, *option_team = 0, *option_pass = 0;
 int option_spec = 0;
-
-int gamemode = ORIGINAL;
+gint movedowntimeout = 0, nextblocktimeout = 0;
+//int gamemode = ORIGINAL;
 
 int fields_width, fields_height;
 
@@ -306,7 +311,7 @@ int main (int argc, char *argv[])
 			     NULL, NULL, NULL);
 
     /* load settings */
-    config_loadconfig ();
+    config_loadconfig (obj);
 
     /* initialise some stuff */
     fields_init ();
@@ -399,13 +404,13 @@ int main (int argc, char *argv[])
             option_connect, option_nick, option_team,
             option_pass, option_spec);
 #endif
-    if (option_nick) GTET_O_STRCPY(nick, option_nick);
-    if (option_team) GTET_O_STRCPY(team, option_team);
-    if (option_pass) GTET_O_STRCPY(specpassword, option_pass);
-    if (option_spec) spectating = TRUE;
+    if (option_nick) GTET_O_STRCPY(obj->nick, option_nick);
+    if (option_team) GTET_O_STRCPY(obj->team, option_team);
+    if (option_pass) GTET_O_STRCPY(obj->specpasswd, option_pass);
+    if (option_spec) obj->spectating = TRUE;
     if (option_connect) {
       connectingdialog_new ();
-      client_init (option_connect, nick);
+      tetrinet_client_init (obj);
     }
 
     /* Don't schedule if data is ready, glib should do this itself,
@@ -415,7 +420,7 @@ int main (int argc, char *argv[])
     /* gtk_main() */
     gtk_main ();
 
-    client_disconnect ();
+    tetrinet_disconnect (obj);
     /* cleanup */
     fields_cleanup ();
     sound_stopmidi ();
@@ -466,18 +471,19 @@ void destroymain (void)
 
 GdkEventKey k;
 gint keytimeoutid = 0;
+gint downcount = 0, downpressed = 0;
 
 gint keytimeout (gpointer data)
 {
     data = data; /* to get rid of the warning */
 
-    if (playing)
+    if (obj->playing)
     {
-      if (gdk_keyval_to_lower (k.keyval) == keys[K_DOWN]) {
+      if (gdk_keyval_to_lower (k.keyval) == keys[TETRINET_DOWN]) {
         /* if it is a quick press, nudge it down one more step */
-        if (downpressed == 1) tetrinet_timeout ();
+        if (downpressed == 1) gtetrinet_timeout ();
         downpressed = 0;
-        tetrinet_settimeout (tetrinet_timeoutduration());
+        gtetrinet_settimeout (tetrinet_timeout_duration(obj));
       }
       gtetrinet_draw_current_block ();
     }
@@ -504,11 +510,11 @@ gint keypress (GtkWidget *widget, GdkEventKey *key)
     {
       /* keys for the playing field - key releases needed - install timeout */
       if (keytimeoutid && key->time == k.time)
-        gtk_timeout_remove (keytimeoutid);
+        g_source_remove (keytimeoutid);
 
-      if (spectating) {
+      if (obj->spectating) {
         /* spectator keys */
-        switch (keyval) {
+        switch (key->keyval) {
         case GDK_1: bigfieldnum = 1; break;
         case GDK_2: bigfieldnum = 2; break;
         case GDK_3: bigfieldnum = 3; break;
@@ -517,15 +523,15 @@ gint keypress (GtkWidget *widget, GdkEventKey *key)
         case GDK_6: bigfieldnum = 6; break;
         default:    goto notfieldkey;
         }
-        tetrinet_updatelevels ();
+        tetrinet_updatelevels (obj);
         fields_redraw ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
       }
     notfieldkey:
-      if (!ingame) return FALSE;
+      if (!obj->ingame) return FALSE;
       
-      if (gdk_keyval_to_lower (keyval) == keys[K_GAMEMSG])
+      if (gdk_keyval_to_lower (key->keyval) == keys[TETRINET_GAMEMSG])
       {
         /*
          * We block the keypress signaling, so we can freely write things
@@ -540,103 +546,103 @@ gint keypress (GtkWidget *widget, GdkEventKey *key)
         return TRUE;
       }
       
-      if (paused || !playing) return FALSE;
+      if (obj->paused || !(obj->playing)) return FALSE;
 
-      switch (gdk_keyval_to_lower (keyval))
+      switch (gdk_keyval_to_lower (key->keyval))
       {
-      case keys[K_ROTRIGHT]:
+      case keys[TETRINET_ROTRIGHT]:
         if (!nextblocktimeout)
           sound_playsound (S_ROTATE);
-        tetris_blockrotate (1);
+        tetris_blockrotate (obj, 1);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
         
-      case keys[K_ROTLEFT]:
+      case keys[TETRINET_ROTLEFT]:
         if (!nextblocktimeout)
           sound_playsound (S_ROTATE);
-        tetris_blockrotate (-1);
+        tetris_blockrotate (obj, -1);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
         
-      case keys[K_RIGHT]:
-        tetris_blockmove (1);
+      case keys[TETRINET_RIGHT]:
+        tetris_blockmove (obj, 1);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
         
-      case keys[K_LEFT]:
-        tetris_blockmove (-1);
+      case keys[TETRINET_LEFT]:
+        tetris_blockmove (obj, -1);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
         
-      case keys[K_DOWN]:
+      case keys[TETRINET_DOWN]:
         if (!downpressed) {
-            tetrinet_timeout ();
+            gtetrinet_timeout ();
             downpressed = 1;
-            tetrinet_settimeout (DOWNDELAY);
+            gtetrinet_settimeout (TETRINET_DOWNDELAY);
         }
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
         
-      case keys[K_DROP]:
+      case keys[TETRINET_DROP]:
       {
         int sound;
         if (!nextblocktimeout) {
-            tetris_blockdrop ();
-            tetris_solidify ();
-            tetrinet_nextblock ();
-            sound = tetrinet_removelines();
+            tetris_blockdrop (obj);
+            tetris_solidify (obj);
+            gtetrinet_nextblock ();
+            sound = tetrinet_removelines(obj);
             if (sound >= 0) sound_playsound (sound);
             else sound_playsound (S_DROP);
-            tetrinet_sendfield (0);
+            tetrinet_sendfield (obj, 0);
         }
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
       }
       
-      case keys[K_DISCARD]:
-        tetrinet_specialkey(-1);
+      case keys[TETRINET_DISCARD]:
+        tetrinet_specialkey(obj, -1);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
 
-      case keys[K_SPECIAL1]:
-	tetrinet_specialkey(1);
+      case keys[TETRINET_SPECIAL1]:
+	tetrinet_specialkey(obj, 1);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
 
-      case keys[K_SPECIAL2]:
-	tetrinet_specialkey(2);
+      case keys[TETRINET_SPECIAL2]:
+	tetrinet_specialkey(obj, 2);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
     
-      case keys[K_SPECIAL3]:
-	tetrinet_specialkey(3);
+      case keys[TETRINET_SPECIAL3]:
+	tetrinet_specialkey(obj, 3);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
 
-      case keys[K_SPECIAL4]:
-	tetrinet_specialkey(4);
+      case keys[TETRINET_SPECIAL4]:
+	tetrinet_specialkey(obj, 4);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
     
-      case keys[K_SPECIAL5]:
-	tetrinet_specialkey(5);
+      case keys[TETRINET_SPECIAL5]:
+	tetrinet_specialkey(obj, 5);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
           
-      case keys[K_SPECIAL6]:
-	tetrinet_specialkey(6);
+      case keys[TETRINET_SPECIAL6]:
+	tetrinet_specialkey(obj, 6);
         gtetrinet_draw_current_block ();
         g_signal_stop_emission_by_name (G_OBJECT(widget), "key-press-event");
         return TRUE;
@@ -1682,7 +1688,7 @@ gtetrinet_next_block_timeout (void)
 
   nextblocktimeout = 0;
   fields_drawnextblock (tetris_getblock (nextblock, nextorient));
-  gtetrinet_settimeout (tetrinet_timeoutduration());
+  gtetrinet_settimeout (tetrinet_block_fall_delay ());
 
   return FALSE;
 }
@@ -1692,7 +1698,7 @@ gtetrinet_settimeout (int duration) // Library function
 {
   if (movedowntimeout)
     gtk_timeout_remove (movedowntimeout);
-  movedowntimeout = gtk_timeout_add (duration, (GtkFunction)tetrinet_timeout,
+  movedowntimeout = gtk_timeout_add (duration, (GtkFunction)gtetrinet_timeout,
                                      NULL);
 }
 
@@ -1717,7 +1723,7 @@ gtetrinet_timeout (void) // Library function
       return FALSE;
     if (downcount) {
       tetris_solidify ();
-      tetrinet_nextblock ();
+      gtetrinet_nextblock ();
       tetrinet_sendfield (0);
       sound = tetrinet_removelines ();
       if (sound>=0) sound_playsound (sound);
@@ -1732,7 +1738,7 @@ gtetrinet_timeout (void) // Library function
 }
 
 void
-gtetrinet_nextblock (void) // Library function
+gtetrinet_nextblock (void)
 {
   if (nextblocktimeout) return;
   gtetrinet_removetimeout ();
@@ -1749,265 +1755,3 @@ gtetrinet_draw_current_block (void)
   g_free (new);
 }
 
-static gboolean
-io_channel_cb (GIOChannel *source, GIOCondition condition)
-{
-  gchar *buf;
-  
-  source = source; /* get rid of the warnings */
-  
-  switch (condition)
-  {
-  case G_IO_IN :
-    if (client_readmsg (&buf) < 0)
-    {
-      g_warning ("client_readmsg failed, aborting connection\n");
-      client_disconnect ();
-    }
-    else
-    {
-      if (strlen (buf)) client_inmessage (buf);
-      
-      if (strncmp ("noconnecting", buf, 12) == 0)
-      {
-        connected = 1; /* so we can disconnect :) */
-        client_disconnect ();
-      }
-      g_free (buf);
-    }
-    break;
-    
-  default:
-    break;
-  }
-  
-  return TRUE;
-}
-
-static void
-gtetrinet_create_connection (TetrinetObject *obj)
-{
-  GThread *thread;
-  gchar *cad;
-        
-  errno = 0;
-  resolved = 0;
-  cancel_connect = 0;
-  
-  thread = g_thread_create ((GThreadFunc) gtetrinet_resolv_hostname, NULL, FALSE, NULL);
-  
-  /* wait until the hostname is resolved */
-  while ((resolved == 0) && !cancel_connect)
-  {
-    if (gtk_events_pending ())
-      gtk_main_iteration ();
-  }
-  
-  /* If the user has canceled the connection */
-  if (cancel_connect)
-  {
-    if (obj->sock != 0) /* close the socket */
-    {
-      shutdown (obj->sock, 2);
-      close (obj->sock);
-    }
-    return;
-  }
-
-  /* Check the resolved value */
-  switch (resolved)
-  {
-  case ERR_RESOLV:
-    if (errno)
-      cad = g_strconcat ("noconnecting ", strerror (errno), NULL);
-    else
-      cad = g_strconcat ("noconnecting ", _("Couldn't resolve hostname."), NULL);
-
-    client_inmessage (cad); // FIXME
-    g_free (cad);
-    
-    return;
-    
-  case ERR_SOCKET:
-    if (errno)
-      cad = g_strconcat ("noconnecting ", strerror (errno), NULL);
-    else
-      cad = g_strconcat ("noconnecting ", _("Couldn't create socket."), NULL);
-
-    client_inmessage (cad); // FIXME
-    g_free (cad);
-
-    return;
-    
-  case ERR_CONNECT:
-    if (errno)
-      cad = g_strconcat ("noconnecting ", strerror (errno), NULL);
-    else
-      cad = g_strconcat ("noconnecting ", _("Couldn't connect to "), server, NULL);
-
-    client_inmessage (cad); // FIXME
-    g_free (cad);
-
-    return;
-  }
-
-  /**
-   * Set up the g_io_channel
-   * We should set it with no encoding and no buffering, just to simplify things */
-  io_channel = g_io_channel_unix_new (obj->sock);
-  g_io_channel_set_encoding (io_channel, NULL, NULL);
-  g_io_channel_set_buffered (io_channel, FALSE);
-  source = g_io_add_watch (io_channel, G_IO_IN, (GIOFunc)io_channel_cb, NULL);
-}
-
-gpointer
-gtetrinet_resolv_hostname (void)
-{
-#ifdef USE_IPV6
-    char hbuf[NI_MAXHOST];
-    struct addrinfo hints, *res, *res0;
-    struct sockaddr_in6 sa;
-    char service[10];
-#else
-    struct hostent *h;
-    struct sockaddr_in sa;
-#endif
-
-    /* set up the connection */
-
-#ifdef USE_IPV6
-    snprintf(service, 9, "%d", spectating?SPECPORT:PORT);
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    if (getaddrinfo(server, service, &hints, &res0)) {
-        /* set errno = 0 so that we know it's a getaddrinfo error */
-        errno = 0;
-        resolved = ERR_RESOLV;
-        g_thread_exit (GINT_TO_POINTER (-1));
-    }
-    for (res = res0; res; res = res->ai_next) {
-        sock = socket (res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (sock < 0) {
-            if (res->ai_next)
-                continue;
-            else {
-                freeaddrinfo(res0);
-                resolved = ERR_SOCKET;
-                g_thread_exit (GINT_TO_POINTER (-1));
-            }
-        }
-        getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf), NULL, 0, 0);
-        if (connect(sock, res->ai_addr, res->ai_addrlen) < 0) {
-            if (res->ai_next) {
-                close(sock);
-                continue;
-            } else {
-                close(sock);
-                freeaddrinfo(res0);
-                resolved = ERR_CONNECT;
-                g_thread_exit (GINT_TO_POINTER (-1));
-            }
-        }
-        break;
-    }
-    freeaddrinfo(res0);
-#else
-    h = gethostbyname (server);
-    if (h == 0) {
-        /* set errno = 0 so that we know it's a gethostbyname error */
-        errno = 0;
-        resolved = ERR_RESOLV;
-        g_thread_exit (GINT_TO_POINTER (-1));
-    }
-    memset (&sa, 0, sizeof (sa));
-    memcpy (&sa.sin_addr, h->h_addr, h->h_length);
-    sa.sin_family = h->h_addrtype;
-    sa.sin_port = htons (spectating?SPECPORT:PORT);
-
-    sock = socket (sa.sin_family, SOCK_STREAM, 0);
-    if (sock < 0)
-    {
-      resolved = ERR_SOCKET;
-      g_thread_exit (GINT_TO_POINTER (-1));
-    }
-
-    if (connect (sock, (struct sockaddr *)&sa, sizeof(sa)) < 0)
-    {
-        resolved = ERR_CONNECT;
-        g_thread_exit (GINT_TO_POINTER (-1));
-    }
-#endif
-
-    resolved = 1;
-    return (GINT_TO_POINTER (1));
-}
-
-int
-gtetrinet_readmsg (gchar **str)
-{
-    gint bytes = 0;
-    gchar buf[1024];
-    GError *error = NULL;
-    gint i = 0;
-  
-    do
-    {
-      switch (g_io_channel_read_chars (io_channel, &buf[i], 1, &bytes, &error))
-      {
-        case G_IO_STATUS_EOF :
-          g_warning ("End of file (server closed connection).");
-          return -1;
-          break;
-        
-        case G_IO_STATUS_AGAIN :
-          g_warning ("Resource temporarily unavailable.");
-          return -1;
-          break;
-        
-        case G_IO_STATUS_ERROR :
-          g_warning ("Error");
-          return -1;
-          break;
-        
-        case G_IO_STATUS_NORMAL :
-          if (error != NULL)
-          {
-            g_warning ("ERROR READING: %s\n", error->message);
-            g_error_free (error);
-            return -1;
-          }; break;
-      }
-      i++;
-    } while ((bytes == 1) && (buf[i-1] != (gchar)0xFF) && (i<1024));
-    buf[i-1] = 0;
-
-#ifdef DEBUG
-    printf ("< %s\n", buf);
-#endif
-    
-    *str = g_strdup (buf);
-
-    return 0;
-}
-
-void
-gtetrinet_disconnect (TetrinetObject *obj)
-{
-  if (obj->connected)
-  {
-    if (gtk_main_level())
-      client_inmessage (obj, "disconnect");
-    g_source_destroy (g_main_context_find_source_by_id (NULL, source));
-    g_io_channel_shutdown (io_channel, TRUE, NULL);
-    g_io_channel_unref (io_channel);
-    shutdown (obj->sock, 2);
-    close (obj->sock);
-    client_disconnect (obj);
-  }
-  else /* Still resolving name or connecting to the host */
-  {
-      /* FIXME: We should kill the thread here */
-    cancel_connect++;
-  }
-}

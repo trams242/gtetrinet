@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#include "tetris.h"
-#include "client.h"
+
 //#include "config.h"
 //#include "fields.h"
 //#include "partyline.h"
@@ -22,6 +21,11 @@
 #define TETRINET_PARTYLINEDELAY1 100
 #define TETRINET_PARTYLINEDELAY2 200
 #define TETRINET_MAX_PLAYERS 7
+#define TETRINET_FIELDWIDTH 12
+#define TETRINET_FIELDHEIGHT 22
+
+typedef char TETRINET_FIELD[TETRINET_FIELDHEIGHT][TETRINET_FIELDWIDTH];
+typedef char TETRIS_BLOCK[4][4];
 
 typedef enum
 {
@@ -36,7 +40,8 @@ typedef enum
   TETRINET_SPECIAL_CLEARSPECIAL,
   TETRINET_SPECIAL_GRAVITY,
   TETRINET_SPECIAL_BLOCKQUAKE,
-  TETRINET_SPECIAL_BLOCKBOMB
+  TETRINET_SPECIAL_BLOCKBOMB,
+  TETRINET_SPECIAL_BLOCKNUM
 } TetrinetSpecialBlock;
 
 typedef enum
@@ -125,9 +130,9 @@ struct TetrinetSpecialInfo tetrinet_sbinfo[] = {
 typedef struct
 {
   int magic;            /* Magic number, it is set to 0xdeadbeef when a Tetrinet object is created */
-  int socket;           /* Socket descriptor */
+  int sock;             /* Socket descriptor */
   
-  int gamemode;         /* It is always a TETRINET_MODE */
+  int gamemode;         /* It is one of TETRINET_MODE */
   int playernum;        /* Number of the player in the game */
   char *team;           /* Name of the team to which the player belongs */
   char *nick;           /* Nickname of the player in this server */
@@ -146,11 +151,11 @@ typedef struct
   char teamnames[TETRINET_MAX_PLAYERS][128];   /* The name of the teams of all the players in the channel */
   int playerlevels[TETRINET_MAX_PLAYERS];      /* The levels of the players in the channel */
   int playerplaying[TETRINET_MAX_PLAYERS];     /* TRUE if the player is playing the game, FALSE if not (he has lost or he is new) */
-  int playercount = 0;                         /* Number of players in this channel */
+  int playercount;                             /* Number of players in this channel */
   
   char spectatorlist[128][128]; /* Names of the spectators */
-  int spectatorcount = 0;       /* Number of spectators in this channel */
-  int moderatornum = 0;         /* FIXME: How many moderators are in the game */
+  int spectatorcount;           /* Number of spectators in this channel */
+  int moderatornum;             /* FIXME: How many moderators are in the game */
   
   int list_issued; /* this will have the number of /list commands sent and waiting for answer */
 
@@ -195,8 +200,20 @@ static char tetrinet_block_chars[] = "012345acnrsbgqo";
 TETRIS_BLOCK tetrinet_blankblock =
 { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
 
+#include "tetris.h"
+#include "client.h"
+
 TetrinetObject *
 tetrinet_object_new (char *server, char *nick, char *team);
+
+void
+tetrinet_object_set_nickname (TetrinetObject *obj, char *name);
+
+void
+tetrinet_object_set_teamname (TetrinetObject *obj, char *name);
+
+void
+tetrinet_object_set_server (TetrinetObject *obj, char *name);
 
 void
 tetrinet_object_destroy (TetrinetObject *obj);
@@ -304,12 +321,9 @@ tetrinet_changeteam (TetrinetObject *obj, const char *newteam);
 void
 tetrinet_sendfield (TetrinetObject *obj, int reset);
 
-void
-tetrinet_updatefield (TetrinetObject *obj, FIELD field); // Not for the API
-
 /* This function returns the falling speed of the current block */
 int
-tetrinet_timeout_duration (TetrinetObject *obj);
+tetrinet_block_fall_delay (TetrinetObject *obj);
 
 void
 tetrinet_pause_game (TetrinetObject *obj);
@@ -318,7 +332,18 @@ void
 tetrinet_resume_game (TetrinetObject *obj);
 
 void
-tetrinet_playerlost (TetrinetObject *obj) // Not for the API
+tetrinet_playerlost (TetrinetObject *obj); // Not for the API
 
+int
+tetrinet_timeout_duration (TetrinetObject *obj);
+
+void
+tetrinet_updatelevels (TetrinetObject *obj);
+
+int
+tetrinet_removelines (TetrinetObject *obj);
+
+void
+tetrinet_specialkey (TetrinetObject *obj, int pnum);
 
 #endif

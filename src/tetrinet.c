@@ -55,6 +55,30 @@ tetrinet_object_new (char *server, char *nick, char *team)
 }
 
 void
+tetrinet_object_set_nickname (TetrinetObject *obj, char *name)
+{
+  if (obj->nick != NULL)
+    free (obj->nick);
+  obj->nick = strdup (name);
+}
+
+void
+tetrinet_object_set_teamname (TetrinetObject *obj, char *name)
+{
+  if (obj->team != NULL)
+    free (obj->team);
+  obj->team = strdup (name);
+}
+
+void
+tetrinet_object_set_server (TetrinetObject *obj, char *name)
+{
+  if (obj->server != NULL)
+    free (obj->server);
+  obj->server = strdup (name);
+}
+
+void
 tetrinet_object_destroy (TetrinetObject *obj)
 {
   if ((obj == NULL) || (obj->magic != 0xdeadbeef))
@@ -413,7 +437,7 @@ tetrinet_do_ingame (TetrinetObject *obj, char *data)
         field[y][x] = randomnum(5) + 1;
     tetrinet_updatefield (obj, field);
     tetrinet_sendfield (obj, 1);
-    fields_drawfield (obj, playerfield(obj, obj->playernum), obj->fields[obj->playernum]);
+    //fields_drawfield (obj, playerfield(obj, obj->playernum), obj->fields[obj->playernum]);
   }
   
   for (i = 0; i <= 6; i ++)

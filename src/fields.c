@@ -61,8 +61,8 @@ static GdkColor black = {0, 0, 0, 0};
 static GdkBitmap *bitmap;
 static GdkCursor *invisible_cursor, *arrow_cursor;
 
-static FIELD displayfields[6]; /* what is actually displayed */
-static TETRISBLOCK displayblock;
+static TETRINET_FIELD displayfields[6]; /* what is actually displayed */
+static TETRIS_BLOCK displayblock;
 
 void fields_init (void)
 {
@@ -177,7 +177,7 @@ GtkWidget *fields_page_contents (void)
 
             widget = gtk_event_box_new ();
             gtk_container_add (GTK_CONTAINER(widget), hbox);
-            gtk_widget_set_size_request (widget, blocksize * FIELDWIDTH, -1);
+            gtk_widget_set_size_request (widget, blocksize * TETRINET_FIELDWIDTH, -1);
             gtk_box_pack_start (GTK_BOX(box), widget, TRUE, TRUE, 0);
             /* the field */
             fieldwidgets[i] = gtk_drawing_area_new ();
@@ -188,8 +188,8 @@ GtkWidget *fields_page_contents (void)
             gtk_widget_set_events (fieldwidgets[i], GDK_EXPOSURE_MASK);
             /* set the size */
             gtk_widget_set_size_request (fieldwidgets[i],
-                                         blocksize * FIELDWIDTH,
-                                         blocksize * FIELDHEIGHT);
+                                         blocksize * TETRINET_FIELDWIDTH,
+                                         blocksize * TETRINET_FIELDHEIGHT);
             gtk_box_pack_start (GTK_BOX(box), fieldwidgets[i], TRUE, TRUE, 0);
             border = gtk_frame_new (NULL);
             gtk_frame_set_shadow_type (GTK_FRAME(border), GTK_SHADOW_IN);
@@ -339,7 +339,7 @@ gint fields_expose_event (GtkWidget *widget, GdkEventExpose *event, int field)
     event = event;
     fields_refreshfield (field);
     /* hide the cursor */
-    if (ingame)
+    if (obj->ingame)
       gdk_window_set_cursor (widget->window, invisible_cursor);
     else
       gdk_window_set_cursor (widget->window, arrow_cursor);
@@ -350,16 +350,16 @@ gint fields_expose_event (GtkWidget *widget, GdkEventExpose *event, int field)
 void fields_refreshfield (int field)
 {
     int x, y;
-    for (y = 0; y < FIELDHEIGHT; y ++)
-        for (x = 0; x < FIELDWIDTH; x ++)
+    for (y = 0; y < TETRINET_FIELDHEIGHT; y ++)
+        for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
             fields_drawblock (field, x, y, displayfields[field][y][x]);
 }
 
-void fields_drawfield (int field, FIELD newfield)
+void fields_drawfield (int field, TETRINET_FIELD newfield)
 {
     int x, y;
-    for (y = 0; y < FIELDHEIGHT; y ++)
-        for (x = 0; x < FIELDWIDTH; x ++)
+    for (y = 0; y < TETRINET_FIELDHEIGHT; y ++)
+        for (x = 0; x < TETRINET_FIELDWIDTH; x ++)
             if (newfield[y][x] != displayfields[field][y][x]) {
                 fields_drawblock (field, x, y, newfield[y][x]);
                 displayfields[field][y][x] = newfield[y][x];
@@ -384,7 +384,7 @@ void fields_drawblock (int field, int x, int y, char block)
     else {
         blocksize = SMALLBLOCKSIZE;
         if (block == 0) {
-            srcx = BLOCKSIZE*FIELDWIDTH + blocksize*x;
+            srcx = BLOCKSIZE*TETRINET_FIELDWIDTH + blocksize*x;
             srcy = BLOCKSIZE+SMALLBLOCKSIZE + blocksize*y;
         }
         else {
@@ -448,7 +448,7 @@ static void fields_setlabel (int field, char *name, char *team, int num)
 gint fields_nextpiece_expose (GtkWidget *widget)
 {
     fields_drawnextblock (NULL);
-    if (ingame)
+    if (obj->ingame)
       gdk_window_set_cursor (widget->window, invisible_cursor);
     else
       gdk_window_set_cursor (widget->window, arrow_cursor);
@@ -458,7 +458,7 @@ gint fields_nextpiece_expose (GtkWidget *widget)
 gint fields_specials_expose (GtkWidget *widget)
 {
     fields_drawspecials ();
-    if (ingame)
+    if (obj->ingame)
       gdk_window_set_cursor (widget->window, invisible_cursor);
     else
       gdk_window_set_cursor (widget->window, arrow_cursor);
@@ -469,10 +469,10 @@ void fields_drawspecials (void)
 {
     int i;
     for (i = 0; i < 18; i ++) {
-        if (i < specialblocknum) {
+        if (i < TETRINET_SPECIAL_BLOCKNUM) {
             gdk_draw_drawable (specialwidget->window,
                                specialwidget->style->black_gc,
-                               blockpix, (specialblocks[i]-1)*BLOCKSIZE,
+                               blockpix, (obj->specialblocks[i]-1)*BLOCKSIZE,
                                0, BLOCKSIZE*i, 0, BLOCKSIZE, BLOCKSIZE);
         }
         else {
@@ -483,7 +483,7 @@ void fields_drawspecials (void)
     }
 }
 
-void fields_drawnextblock (TETRISBLOCK block)
+void fields_drawnextblock (TETRIS_BLOCK block)
 {
     int x, y, xstart = 4, ystart = 4;
     if (block == NULL) block = displayblock;
@@ -614,20 +614,20 @@ void gmsginput_activate (void)
     if (strlen(s) > 0) {
         if (strncmp("/me ", s, 4) == 0) {
             /* post /me thingy */
-            g_snprintf (buf, sizeof(buf), "* %s %s", nick, s+4);
+            g_snprintf (buf, sizeof(buf), "* %s %s", obj->nick, s+4);
             locale_s = g_locale_from_utf8 (buf, -1, NULL, NULL, NULL);
 			/* FIXME : if there is an error while converting from UTF8 to current locale, we ignore the message */
 			if (locale_s == NULL) return;
-            client_outmessage (OUT_GMSG, locale_s);
+            tetrinet_outmessage (obj, TETRINET_OUT_GMSG, locale_s);
             g_free (locale_s);
         }
         else {
             /* post message */
-            g_snprintf (buf, sizeof(buf), "<%s> %s", nick, s);
+            g_snprintf (buf, sizeof(buf), "<%s> %s", obj->nick, s);
             locale_s = g_locale_from_utf8 (buf, -1, NULL, NULL, NULL);
 			/* FIXME : if there is an error while converting from UTF8 to current locale, we ignore the message */
 			if (locale_s == NULL) return;
-            client_outmessage (OUT_GMSG, locale_s);
+            tetrinet_outmessage (obj, TETRINET_OUT_GMSG, locale_s);
             g_free (locale_s);
         }
     }
@@ -642,13 +642,20 @@ const char *fields_gmsginputtext (void)
     return gtk_entry_get_text (GTK_ENTRY(gmsginput));
 }
 
+int fields_playerfield (int p)
+{
+  if (p < bigfieldnum) return p;
+  else if (p == bigfieldnum) return 0;
+  else return p - 1;
+}
+
 void fields_redraw (void) // Interface function
 {
     int i;
 
-    fieldslabelupdate ();
-    if (ingame) for (i = 1; i <= 6; i ++)
-        fields_drawfield (playerfield(i), fields[i]);
+    fields_labelupdate ();
+    if (obj->ingame) for (i = 1; i <= 6; i ++)
+        fields_drawfield (fields_playerfield(i), obj->fields[i]);
 }
 
 void fields_setspeciallabel (int sb) // Interface function
@@ -670,18 +677,10 @@ void fields_labelupdate (void) // Interface function
 {
     int i;
     for (i = 1; i <= 6; i ++) {
-        if (playernames[i][0] == 0)
-            fields_setlabel (playerfield(i), NULL, NULL, 0);
+        if (obj->playernames[i][0] == 0)
+            fields_setlabel (fields_playerfield(i), NULL, NULL, 0);
         else
-            fields_setlabel (playerfield(i), playernames[i], teamnames[i], i);
+            fields_setlabel (fields_playerfield(i), obj->playernames[i], obj->teamnames[i], i);
     }
-}
-
-int
-fields_playerfield (int p)
-{
-    if (p < bigfieldnum) return p;
-    else if (p == bigfieldnum) return 0;
-    else return p - 1;
 }
 

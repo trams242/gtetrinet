@@ -22,6 +22,7 @@
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -35,60 +36,35 @@
 #include <ctype.h>
 
 #include "client.h"
-#include "tetrinet.h"
 //#include "partyline.h"
 //#include "dialogs.h"
 //#include "misc.h"
 //#include "gtetrinet.h"
 
-/* structures and arrays for message translation */
+enum TetrinetInmsg
+tetrinet_inmsg_translate (char *str)
+{
+    int i;
+    for (i = 0; inmsgtable[i].str; i++)
+        if (strcmp (inmsgtable[i].str, str) == 0)
+            return inmsgtable[i].num;
 
-struct inmsgt {
-    enum inmsg_type num;
-    char *str;
-};
+    return 0;
+}
 
-struct outmsgt {
-    enum outmsg_type num;
-    char *str;
-};
+char *
+tetrinet_outmsg_translate (unsigned int num)
+{
+    int i;
+    for (i = 0; outmsgtable[i].num; i++)
+        if (outmsgtable[i].num==num)
+          return outmsgtable[i].str;
 
-/* some of these strings change depending on the game mode selected */
-/* these changes are put into effect through the function inmsg_change */
-struct inmsgt inmsgtable[] = {
-    {TETRINET_IN_CONNECT, "connect"},
-    {TETRINET_IN_DISCONNECT, "disconnect"},
-
-    {TETRINET_IN_CONNECTERROR, "noconnecting"},
-    {TETRINET_IN_PLAYERNUM, "playernum"},
-    {TETRINET_IN_PLAYERJOIN, "playerjoin"},
-    {TETRINET_IN_PLAYERLEAVE, "playerleave"},
-    {TETRINET_IN_KICK, "kick"},
-    {TETRINET_IN_TEAM, "team"},
-    {TETRINET_IN_PLINE, "pline"},
-    {TETRINET_IN_PLINEACT, "plineact"},
-    {TETRINET_IN_PLAYERLOST, "playerlost"},
-    {TETRINET_IN_PLAYERWON, "playerwon"},
-    {TETRINET_IN_NEWGAME, "newgame"},
-    {TETRINET_IN_INGAME, "ingame"},
-    {TETRINET_IN_PAUSE, "pause"},
-    {TETRINET_IN_ENDGAME, "endgame"},
-    {TETRINET_IN_F, "f"},
-    {TETRINET_IN_SB, "sb"},
-    {TETRINET_IN_LVL, "lvl"},
-    {TETRINET_IN_GMSG, "gmsg"},
-    {TETRINET_IN_WINLIST, "winlist"},
-
-    {TETRINET_IN_SPECJOIN, "specjoin"},
-    {TETRINET_IN_SPECLEAVE, "specleave"},
-    {TETRINET_IN_SPECLIST, "speclist"},
-    {TETRINET_IN_SMSG, "smsg"},
-    {TETRINET_IN_SACT, "sact"},
-    {0, 0}
-};
+    return NULL;
+}
 
 static struct inmsgt *
-get_inmsg_entry(int num)
+get_inmsg_entry(unsigned int num)
 {
     int i;
     for (i = 0; inmsgtable[i].num && inmsgtable[i].num != num; i ++);
@@ -110,34 +86,15 @@ inmsg_change(TetrinetObject *obj)
     }
 }
 
-struct outmsgt outmsgtable[] = {
-    {TETRINET_OUT_DISCONNECT, "disconnect"},
-    {TETRINET_OUT_CONNECTED, "connected"},
-
-    {TETRINET_OUT_TEAM, "team"},
-    {TETRINET_OUT_PLINE, "pline"},
-    {TETRINET_OUT_PLINEACT, "plineact"},
-    {TETRINET_OUT_PLAYERLOST, "playerlost"},
-    {TETRINET_OUT_F, "f"},
-    {TETRINET_OUT_SB, "sb"},
-    {TETRINET_OUT_LVL, "lvl"},
-    {TETRINET_OUT_STARTGAME, "startgame"},
-    {TETRINET_OUT_PAUSE, "pause"},
-    {TETRINET_OUT_GMSG, "gmsg"},
-
-    {TETRINET_OUT_VERSION, "version"},
-    {0, 0}
-};
-
 /* some other useful functions */
-static int tetrinet_sendmsg (char *str);
-static void tetrinet_server_ip (unsigned char buf[4]);
+static int tetrinet_sendmsg (TetrinetObject *obj, char *str);
+static void tetrinet_server_ip (TetrinetObject *obj, unsigned char buf[4]);
 
-enum inmsg_type tetrinet_inmsg_translate (char *str);
-char *tetrinet_outmsg_translate (int);
+enum TetrinetInmsg tetrinet_inmsg_translate (char *str);
+char *tetrinet_outmsg_translate (unsigned int);
 
 void
-tetrinet_client_init (TetrinetObject *obj);
+tetrinet_client_init (TetrinetObject *obj)
 {
 //  GString *s1 = g_string_sized_new(80);
 //  GString *s2 = g_string_sized_new(80);
@@ -148,7 +105,7 @@ tetrinet_client_init (TetrinetObject *obj);
   int l;
   
   /* set the game mode */
-  inmsg_change();
+  inmsg_change (obj);
     
   /* construct message */
   if (obj->gamemode == TETRINET_MODE_TETRIFAST)
@@ -157,7 +114,7 @@ tetrinet_client_init (TetrinetObject *obj);
     sprintf (s1, "tetrisstart %s 1.13", obj->nick);
 
   /* do that encoding thingy */
-  server_ip (obj, ip);
+  tetrinet_server_ip (obj, ip);
   sprintf (iphashbuf, "%d", ip[0]*54 + ip[1]*41 + ip[2]*29 + ip[3]*17);
   l = strlen (iphashbuf);
 
@@ -185,20 +142,25 @@ tetrinet_client_init (TetrinetObject *obj);
 }
 
 void
-tetrinet_outmessage (TetrinetObject *obj, int msgtype, char *str)
+tetrinet_outmessage (TetrinetObject *obj, unsigned int msgtype, char *str)
 {
-    char buf[1024];
-    GTET_O_STRCPY(buf, outmsg_translate (msgtype));
-    if (str) {
-        GTET_O_STRCAT(buf, " ");
-        GTET_O_STRCAT(buf, str);
-    }
-    switch (msgtype)
-    {
-    case TETRINET_OUT_DISCONNECT : break;
-    case TETRINET_OUT_CONNECTED : break;
-      default : client_sendmsg (obj, buf);
-    }
+  char *buf = (char*) malloc (sizeof (char) * (strlen (str) + 20));
+
+  strcpy (buf, tetrinet_outmsg_translate (msgtype));
+  if (str)
+  {
+    strcat (buf, " ");
+    strcat (buf, str);
+  }
+  
+  switch (msgtype)
+  {
+  case TETRINET_OUT_DISCONNECT : break;
+  case TETRINET_OUT_CONNECTED : break;
+  default : tetrinet_sendmsg (obj, buf);
+  }
+
+  free (buf);
 }
 
 TetrinetServerMsg*
@@ -207,7 +169,10 @@ tetrinet_servermsg_new (int msgtype, char *data)
   TetrinetServerMsg *msg = (TetrinetServerMsg*) malloc (sizeof (TetrinetServerMsg));
 
   msg->msgtype = msgtype;
-  msg->data = data;
+  if (data != NULL)
+    msg->data = strdup (data);
+  else
+    msg->data = NULL;
 
   return msg;
 }
@@ -221,7 +186,7 @@ tetrinet_servermsg_destroy (TetrinetServerMsg *msg)
 }
 
 TetrinetServerMsg *
-tetrinet_inmessage (TetrinetObject *obj, char *str)
+tetrinet_inmessage (char *str)
 {
     int msgtype, i;
     char *aux = strdup (str);
@@ -281,24 +246,3 @@ tetrinet_server_ip (TetrinetObject *obj, unsigned char buf[4])
 #endif
 }
 
-int
-tetrinet_inmsg_translate (char *str)
-{
-    int i;
-    for (i = 0; inmsgtable[i].str; i++)
-        if (strcmp (inmsgtable[i].str, str) == 0)
-            return inmsgtable[i].num;
-
-    return 0;
-}
-
-char *
-tetrinet_outmsg_translate (int num)
-{
-    int i;
-    for (i = 0; outmsgtable[i].num; i++)
-        if (outmsgtable[i].num==num)
-          return outmsgtable[i].str;
-
-    return NULL;
-}

@@ -18,7 +18,7 @@ extern guint defaultkeys[];
 
 extern void config_loadtheme (const gchar *themedir);
 extern gint config_getthemeinfo (char *themedir, char *name, char *author, char *desc);
-extern void config_loadconfig (void);
+extern void config_loadconfig (TetrinetObject *obj);
 extern void config_saveconfig (void);
 
 void

@@ -62,7 +62,7 @@ static char *soundkeys[S_NUM] = {
     "Sounds/GameStart",
 };
 
-guint defaultkeys[K_NUM] = {
+guint defaultkeys[TETRINET_TOTAL_KEYS] = {
     GDK_Right,
     GDK_Left,
     GDK_Up,
@@ -79,7 +79,7 @@ guint defaultkeys[K_NUM] = {
     GDK_6
 };
 
-guint keys[K_NUM];
+guint keys[TETRINET_TOTAL_KEYS];
 
 /* themedir is assumed to have a trailing slash */
 void config_loadtheme (const gchar *themedir)
@@ -204,7 +204,7 @@ int config_getthemeinfo (char *themedir, char *name, char *author, char *desc)
     return 0;
 }
 
-void config_loadconfig (void)
+void config_loadconfig (TetrinetObject *obj)
 {
     gchar *p;
 
@@ -246,21 +246,15 @@ void config_loadconfig (void)
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/player/nickname", NULL);
     if (p)
     {
-      if (nick != NULL)
-        g_free (nick);
-      g_strlcpy (nick, p, 128);
+      tetrinet_object_set_nickname (obj, p);
       g_free (p);
-//        GTET_O_STRCPY(nick, p);
     }
 
     /* get the server name */
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/player/server", NULL);
     if (p)
     {
-      if (server != NULL)
-        g_free (server);
-      g_strlcpy (server, p, 128);
-//        GTET_O_STRCPY(server, p);
+      tetrinet_object_set_server (obj, p);
       g_free(p);
     }
 
@@ -268,139 +262,136 @@ void config_loadconfig (void)
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/player/team", NULL);
     if (p)
     {
-      if (team != NULL)
-        g_free (team);
-      g_strlcpy (team, p, 128);
+      tetrinet_object_set_teamname (obj, p);
       g_free (p);
-//        GTET_O_STRCPY(team, p);
     }
 
     /* get the keys */
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/right", NULL);
     if (p)
     {
-      keys[K_RIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_RIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_RIGHT] = defaultkeys[K_RIGHT];
+      keys[TETRINET_RIGHT] = defaultkeys[TETRINET_RIGHT];
     
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/left", NULL);
     if (p)
     {
-      keys[K_LEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_LEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_LEFT] = defaultkeys[K_LEFT];
+      keys[TETRINET_LEFT] = defaultkeys[TETRINET_LEFT];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/rotate_right", NULL);
     if (p)
     {
-      keys[K_ROTRIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_ROTRIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_ROTRIGHT] = defaultkeys[K_ROTRIGHT];
+      keys[TETRINET_ROTRIGHT] = defaultkeys[TETRINET_ROTRIGHT];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/rotate_left", NULL);
     if (p)
     {
-      keys[K_ROTLEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_ROTLEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_ROTLEFT] = defaultkeys[K_ROTLEFT];
+      keys[TETRINET_ROTLEFT] = defaultkeys[TETRINET_ROTLEFT];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/down", NULL);
     if (p)
     {
-      keys[K_DOWN] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_DOWN] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_DOWN] = defaultkeys[K_DOWN];
+      keys[TETRINET_DOWN] = defaultkeys[TETRINET_DOWN];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/drop", NULL);
     if (p)
     {
-      keys[K_DROP] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_DROP] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_DROP] = defaultkeys[K_DROP];
+      keys[TETRINET_DROP] = defaultkeys[TETRINET_DROP];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/discard", NULL);
     if (p)
     {
-      keys[K_DISCARD] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_DISCARD] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_DISCARD] = defaultkeys[K_DISCARD];
+      keys[TETRINET_DISCARD] = defaultkeys[TETRINET_DISCARD];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/message", NULL);
     if (p)
     {
-      keys[K_GAMEMSG] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_GAMEMSG] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_GAMEMSG] = defaultkeys[K_GAMEMSG];
+      keys[TETRINET_GAMEMSG] = defaultkeys[TETRINET_GAMEMSG];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/special1", NULL);
     if (p)
     {
-      keys[K_SPECIAL1] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_SPECIAL1] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_SPECIAL1] = defaultkeys[K_SPECIAL1];
+      keys[TETRINET_SPECIAL1] = defaultkeys[TETRINET_SPECIAL1];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/special2", NULL);
     if (p)
     {
-      keys[K_SPECIAL2] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_SPECIAL2] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_SPECIAL2] = defaultkeys[K_SPECIAL2];
+      keys[TETRINET_SPECIAL2] = defaultkeys[TETRINET_SPECIAL2];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/special3", NULL);
     if (p)
     {
-      keys[K_SPECIAL3] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_SPECIAL3] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_SPECIAL3] = defaultkeys[K_SPECIAL3];
+      keys[TETRINET_SPECIAL3] = defaultkeys[TETRINET_SPECIAL3];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/special4", NULL);
     if (p)
     {
-      keys[K_SPECIAL4] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_SPECIAL4] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_SPECIAL4] = defaultkeys[K_SPECIAL4];
+      keys[TETRINET_SPECIAL4] = defaultkeys[TETRINET_SPECIAL4];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/special5", NULL);
     if (p)
     {
-      keys[K_SPECIAL5] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_SPECIAL5] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_SPECIAL5] = defaultkeys[K_SPECIAL5];
+      keys[TETRINET_SPECIAL5] = defaultkeys[TETRINET_SPECIAL5];
 
     p = gconf_client_get_string (gconf_client, "/apps/gtetrinet/keys/special6", NULL);
     if (p)
     {
-      keys[K_SPECIAL6] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
+      keys[TETRINET_SPECIAL6] = gdk_keyval_to_lower (gdk_keyval_from_name (p));
       g_free (p);
     }
     else
-      keys[K_SPECIAL6] = defaultkeys[K_SPECIAL6];
+      keys[TETRINET_SPECIAL6] = defaultkeys[TETRINET_SPECIAL6];
 
 
     /* Get the timestamp option. */
@@ -423,13 +414,11 @@ void load_theme (const gchar *theme_dir)
   fields_cleanup ();
   fields_init ();
   fields_page_new ();
-  fieldslabelupdate();
-  if (ingame)
-  {
-    sound_stopmidi ();
-    sound_playmidi (midifile);
-    tetrinet_redrawfields ();
-  }
+  fields_labelupdate();
+
+  sound_stopmidi ();
+  sound_playmidi (midifile);
+  fields_redraw ();
 }
 
 void
@@ -445,11 +434,8 @@ sound_midi_player_changed (GConfClient *client,
     g_free (midicmd);
   midicmd = g_strdup (gconf_value_get_string (gconf_entry_get_value (entry)));
   
-  if (ingame)
-  {
-    sound_stopmidi ();
-    sound_playmidi (midifile);
-  }
+  sound_stopmidi ();
+  sound_playmidi (midifile);
 }
 
 void
@@ -503,7 +489,7 @@ keys_down_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_DOWN] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_DOWN] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -515,7 +501,7 @@ keys_left_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_LEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_LEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -527,7 +513,7 @@ keys_right_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_RIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_RIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -539,7 +525,7 @@ keys_drop_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_DROP] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_DROP] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -551,7 +537,7 @@ keys_rotate_left_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_ROTLEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_ROTLEFT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -563,7 +549,7 @@ keys_rotate_right_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_ROTRIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_ROTRIGHT] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -575,7 +561,7 @@ keys_message_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_GAMEMSG] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_GAMEMSG] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -587,7 +573,7 @@ keys_discard_changed (GConfClient *client,
   client = client;	/* Suppress compile warnings */
   cnxn_id = cnxn_id;	/* Suppress compile warnings */
 
-  keys[K_DISCARD] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_DISCARD] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -599,7 +585,7 @@ keys_special1_changed (GConfClient *client,
   client = client;
   cnxn_id = cnxn_id;
 
-  keys[K_SPECIAL1] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_SPECIAL1] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -611,7 +597,7 @@ keys_special2_changed (GConfClient *client,
   client = client;
   cnxn_id = cnxn_id;
 
-  keys[K_SPECIAL2] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_SPECIAL2] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -623,7 +609,7 @@ keys_special3_changed (GConfClient *client,
   client = client;
   cnxn_id = cnxn_id;
 
-  keys[K_SPECIAL3] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_SPECIAL3] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -635,7 +621,7 @@ keys_special4_changed (GConfClient *client,
   client = client;
   cnxn_id = cnxn_id;
 
-  keys[K_SPECIAL4] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_SPECIAL4] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -647,7 +633,7 @@ keys_special5_changed (GConfClient *client,
   client = client;
   cnxn_id = cnxn_id;
 
-  keys[K_SPECIAL5] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_SPECIAL5] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void
@@ -659,7 +645,7 @@ keys_special6_changed (GConfClient *client,
   client = client;
   cnxn_id = cnxn_id;
 
-  keys[K_SPECIAL6] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
+  keys[TETRINET_SPECIAL6] = gdk_keyval_to_lower (gdk_keyval_from_name (gconf_value_get_string (gconf_entry_get_value (entry))));
 }
 
 void

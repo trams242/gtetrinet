@@ -2,6 +2,7 @@
 #define __GTETRINET_GTETRINET_H__
 
 #include <gtk/gtk.h>
+#include <libgnomeui/libgnomeui.h>
 #include <gnome.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdlib.h>
@@ -10,8 +11,6 @@
 #define APPID PACKAGE
 #define APPNAME "GTetrinet"
 #define APPVERSION VERSION
-
-extern void gtetrinet_inmessage (enum inmsg_type msgtype, char *data);
 
 #include "tetrinet.h"
 #include "misc.h"
@@ -23,6 +22,7 @@ extern void gtetrinet_inmessage (enum inmsg_type msgtype, char *data);
 #include "config.h"
 
 extern GtkWidget *app;
+extern TetrinetObject *obj;
 
 extern void destroymain (void);
 extern gint keypress (GtkWidget *widget, GdkEventKey *key);
@@ -33,5 +33,6 @@ extern void show_partyline_page (void);
 extern void unblock_keyboard_signal (void);
 extern gint get_current_notebook_page (void);
 extern void commands_checkstate (void);
+extern void gtetrinet_inmessage (enum TetrinetInmsg msgtype, char *data);
 
 #endif

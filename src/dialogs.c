@@ -58,10 +58,10 @@ void connectingdialog_button (GtkWidget *dialog, gint button)
     dialog = dialog;
     switch (button) {
     case GTK_RESPONSE_CANCEL:
-        gtk_timeout_remove (timeouttag);
+        g_source_remove (timeouttag);
         timeouttag = 0;
         if (connectingdialog == 0) return;
-        client_disconnect ();
+        tetrinet_disconnect (obj);
         gtk_widget_destroy (connectingdialog);
         connectingdialog = 0;
         break;
@@ -97,7 +97,7 @@ void connectingdialog_new (void)
     gtk_box_pack_start (GTK_BOX (GTK_DIALOG(connectingdialog)->vbox),
                         progressbar, TRUE, TRUE, 0);
 
-    timeouttag = gtk_timeout_add (100, (GtkFunction)connectingdialog_timeout,
+    timeouttag = g_timeout_add (100, (GSourceFunc)connectingdialog_timeout,
                                   NULL);
     g_signal_connect (G_OBJECT(connectingdialog), "response",
                         GTK_SIGNAL_FUNC(connectingdialog_button), NULL);
@@ -108,7 +108,7 @@ void connectingdialog_new (void)
 
 void connectingdialog_destroy (void)
 {
-    if (timeouttag != 0) gtk_timeout_remove (timeouttag);
+    if (timeouttag != 0) g_source_remove (timeouttag);
     timeouttag = 0;
     if (connectingdialog == 0) return;
     gtk_widget_destroy (connectingdialog);
@@ -126,7 +126,7 @@ void teamdialog_destroy (void)
 
 void teamdialog_button (GtkWidget *button, gint response, gpointer data)
 {
-    GtkEntry *entry = GTK_ENTRY (gnome_entry_gtk_entry (GNOME_ENTRY (data)));
+    GtkEntry *entry = GTK_ENTRY (data);
     gchar *aux, *buf;
 
     button = button; /* so we get no unused parameter warning */
@@ -137,10 +137,10 @@ void teamdialog_button (GtkWidget *button, gint response, gpointer data)
         aux = g_locale_from_utf8 (gtk_entry_get_text (entry), -1, NULL, NULL, NULL);
         gconf_client_set_string (gconf_client, "/apps/gtetrinet/player/team",
                                  gtk_entry_get_text (entry), NULL);
-        buf = tetrinet_changeteam (aux);
+        buf = tetrinet_changeteam (obj, aux);
         if (buf != NULL)
         {
-          gtetrinet_inmessage (IN_TEAM, buf);
+          gtetrinet_inmessage (TETRINET_IN_TEAM, buf);
           g_free (buf);
         }
         g_free (aux);
@@ -153,7 +153,7 @@ void teamdialog_button (GtkWidget *button, gint response, gpointer data)
 void teamdialog_new (void)
 {
     GtkWidget *hbox, *widget, *entry;
-    gchar *team_utf8 = g_locale_to_utf8 (team, -1, NULL, NULL, NULL);
+    gchar *team_utf8 = g_locale_to_utf8 (obj->team, -1, NULL, NULL, NULL);
   
     if (team_dialog != NULL)
     {
@@ -176,11 +176,9 @@ void teamdialog_new (void)
     hbox = gtk_hbox_new (FALSE, GNOME_PAD_SMALL);
     widget = gtk_label_new (_("Team name:"));
     gtk_box_pack_start_defaults (GTK_BOX (hbox), widget);
-    entry = gnome_entry_new ("Team");
-    gtk_entry_set_text (GTK_ENTRY (gnome_entry_gtk_entry (GNOME_ENTRY (entry))),
-                        team_utf8);
-    g_object_set (G_OBJECT (gnome_entry_gtk_entry (GNOME_ENTRY (entry))),
-                  "activates_default", TRUE, NULL);
+    entry = gtk_entry_new ();
+    gtk_entry_set_text (GTK_ENTRY (entry), team_utf8);
+    g_object_set (G_OBJECT (entry), "activates_default", TRUE, NULL);
     g_free (team_utf8);
     gtk_box_pack_start_defaults (GTK_BOX (hbox), entry);
     gtk_container_set_border_width (GTK_CONTAINER (hbox), GNOME_PAD_SMALL);
@@ -213,7 +211,7 @@ void connectdialog_button (GtkDialog *dialog, gint button)
     switch (button) {
     case GTK_RESPONSE_OK:
         /* connect now */
-        server1 = gtk_entry_get_text (GTK_ENTRY (gnome_entry_gtk_entry (GNOME_ENTRY (serveraddressentry))));
+        server1 = gtk_entry_get_text (GTK_ENTRY (serveraddressentry));
         if (g_utf8_strlen (server1, -1) <= 0)
         {
           dialog_error = gtk_message_dialog_new (GTK_WINDOW (dialog),
@@ -226,12 +224,12 @@ void connectdialog_button (GtkDialog *dialog, gint button)
           return;
         }
     
-        spectating = GTK_TOGGLE_BUTTON(spectatorcheck)->active ? TRUE : FALSE;
-        if (spectating)
+        obj->spectating = GTK_TOGGLE_BUTTON (spectatorcheck)->active ? TRUE : FALSE;
+        if (obj->spectating)
         {
-          g_utf8_strncpy (specpassword, gtk_entry_get_text (GTK_ENTRY(passwordentry)),
+          g_utf8_strncpy (obj->specpasswd, gtk_entry_get_text (GTK_ENTRY(passwordentry)),
                           g_utf8_strlen (gtk_entry_get_text (GTK_ENTRY (passwordentry)), -1));
-          if (g_utf8_strlen (specpassword, -1) <= 0)
+          if (g_utf8_strlen (obj->specpasswd, -1) <= 0)
           {
             dialog_error = gtk_message_dialog_new (GTK_WINDOW (dialog),
                                                    GTK_DIALOG_MODAL,
@@ -244,18 +242,17 @@ void connectdialog_button (GtkDialog *dialog, gint button)
           }
         }
         
-        team_utf8 = g_locale_from_utf8 (gtk_entry_get_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(teamnameentry)))),
-                                        -1, NULL, NULL, NULL);
+        team_utf8 = g_locale_from_utf8 (gtk_entry_get_text (GTK_ENTRY (teamnameentry)), -1, NULL, NULL, NULL);
         
-        GTET_O_STRCPY (team, team_utf8);
+        GTET_O_STRCPY (obj->team, team_utf8);
         
-        nick = g_strdup (gtk_entry_get_text (GTK_ENTRY (gnome_entry_gtk_entry (GNOME_ENTRY (nicknameentry)))));
+        obj->nick = g_strdup (gtk_entry_get_text (GTK_ENTRY (nicknameentry)));
         g_strstrip (nick); /* we remove leading and trailing whitespaces */
         if (g_utf8_strlen (nick, -1) > 0)
         {
           nick1 = g_locale_from_utf8 (nick, -1, NULL, NULL, NULL);
           connectingdialog_new ();
-          client_init (server1, nick1);
+          tetrinet_client_init (obj);
           g_free (nick1);
         }
         else
@@ -273,13 +270,13 @@ void connectdialog_button (GtkDialog *dialog, gint button)
         gconf_client_set_string (gconf_client, "/apps/gtetrinet/player/server", server1, NULL);
         gconf_client_set_string (gconf_client, "/apps/gtetrinet/player/nickname", nick, NULL);
         gconf_client_set_string (gconf_client, "/apps/gtetrinet/player/team",
-                                 gtk_entry_get_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(teamnameentry)))),
+                                 gtk_entry_get_text (GTK_ENTRY (teamnameentry)),
                                  NULL);
         g_free (team_utf8);
         g_free (nick);
         break;
     case GTK_RESPONSE_CANCEL:
-        tetrinet_gamemode = oldgamemode;
+        obj->gamemode = oldgamemode;
         gtk_widget_destroy (connectdialog);
         break;
     }
@@ -304,14 +301,14 @@ void connectdialog_spectoggle (GtkWidget *widget)
 void connectdialog_originaltoggle (GtkWidget *widget)
 {
     if (GTK_TOGGLE_BUTTON(widget)-> active) {
-        tetrinet_gamemode = TETRINET_MODE_ORIGINAL;
+        obj->gamemode = TETRINET_MODE_ORIGINAL;
     }
 }
 
 void connectdialog_tetrifasttoggle (GtkWidget *widget)
 {
     if (GTK_TOGGLE_BUTTON(widget)-> active) {
-        tetrinet_gamemode = TETRINET_MODE_TETRIFAST;
+        obj->gamemode = TETRINET_MODE_TETRIFAST;
     }
 }
 
@@ -338,7 +335,7 @@ void connectdialog_new (void)
     connecting = TRUE;
 
     /* save some stuff */
-    oldgamemode = tetrinet_gamemode;
+    oldgamemode = obj->gamemode;
 
     /* make dialog that asks for address/nickname */
     connectdialog = gtk_dialog_new_with_buttons (_("Connect to server"),
@@ -360,11 +357,9 @@ void connectdialog_new (void)
     /* server address */
     table2 = gtk_table_new (2, 1, FALSE);
 
-    serveraddressentry = gnome_entry_new ("Server");
-    g_object_set(G_OBJECT(gnome_entry_gtk_entry(GNOME_ENTRY(serveraddressentry))),
-                 "activates_default", TRUE, NULL);
-    gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(serveraddressentry))),
-                        server);
+    serveraddressentry = gtk_entry_new ();
+    g_object_set (G_OBJECT (serveraddressentry), "activates_default", TRUE, NULL);
+    gtk_entry_set_text (GTK_ENTRY(serveraddressentry), obj->server);
     gtk_table_attach (GTK_TABLE(table2), serveraddressentry,
                       0, 1, 0, 1, GTK_FILL | GTK_EXPAND,
                       GTK_FILL | GTK_EXPAND, 0, 0);
@@ -372,7 +367,7 @@ void connectdialog_new (void)
     originalradio = gtk_radio_button_new_with_mnemonic (NULL, _("O_riginal"));
     gametypegroup = gtk_radio_button_get_group (GTK_RADIO_BUTTON(originalradio));
     tetrifastradio = gtk_radio_button_new_with_mnemonic (gametypegroup, _("Tetri_Fast"));
-    switch (tetrinet_gamemode) {
+    switch (obj->gamemode) {
     case TETRINET_MODE_ORIGINAL:
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(originalradio), TRUE);
         break;
@@ -425,26 +420,22 @@ void connectdialog_new (void)
     widget = gtk_label_new_with_mnemonic (_("_Nick name:"));
     gtk_table_attach (GTK_TABLE(table2), widget, 0, 1, 0, 1,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
-    nicknameentry = gnome_entry_new ("Nickname");
+    nicknameentry = gtk_entry_new ();
     gtk_label_set_mnemonic_widget (GTK_LABEL (widget), nicknameentry);
-    g_object_set(G_OBJECT(gnome_entry_gtk_entry(GNOME_ENTRY(nicknameentry))),
-                 "activates_default", TRUE, NULL);
-    aux = g_locale_to_utf8 (nick, -1, NULL, NULL, NULL);
-    gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(nicknameentry))),
-                        aux);
+    g_object_set (G_OBJECT (nicknameentry), "activates_default", TRUE, NULL);
+    aux = g_locale_to_utf8 (obj->nick, -1, NULL, NULL, NULL);
+    gtk_entry_set_text (GTK_ENTRY (nicknameentry), aux);
     g_free (aux);
     gtk_table_attach (GTK_TABLE(table2), nicknameentry, 1, 2, 0, 1,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
     teamnamelabel = gtk_label_new_with_mnemonic (_("_Team name:"));
     gtk_table_attach (GTK_TABLE(table2), teamnamelabel, 0, 1, 1, 2,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
-    teamnameentry = gnome_entry_new ("Teamname");
+    teamnameentry = gtk_entry_new ();
     gtk_label_set_mnemonic_widget (GTK_LABEL (teamnamelabel), teamnameentry);
-    g_object_set(G_OBJECT(gnome_entry_gtk_entry(GNOME_ENTRY(teamnameentry))),
-                 "activates_default", TRUE, NULL);
-    aux = g_locale_to_utf8 (team, -1, NULL, NULL, NULL);
-    gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(teamnameentry))),
-                        aux);
+    g_object_set (G_OBJECT (teamnameentry), "activates_default", TRUE, NULL);
+    aux = g_locale_to_utf8 (obj->team, -1, NULL, NULL, NULL);
+    gtk_entry_set_text (GTK_ENTRY (teamnameentry), aux);
     g_free (aux);
     gtk_table_attach (GTK_TABLE(table2), teamnameentry, 1, 2, 1, 2,
                       GTK_FILL | GTK_EXPAND, 0, 0, 0);
@@ -462,7 +453,7 @@ void connectdialog_new (void)
     gtk_box_pack_start (GTK_BOX (GTK_DIALOG(connectdialog)->vbox),
                         table1, TRUE, TRUE, 0);
 
-    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(spectatorcheck), spectating);
+    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(spectatorcheck), obj->spectating);
     connectdialog_spectoggle (spectatorcheck);
     g_signal_connect (G_OBJECT(connectdialog), "destroy",
                         GTK_SIGNAL_FUNC(connectdialog_destroy), NULL);
@@ -519,7 +510,7 @@ GtkWidget *timestampcheck;
 GtkWidget *midientry, *miditable, *midicheck, *soundcheck;
 GtkWidget *namelabel, *authlabel, *desclabel;
 
-gchar *actions[K_NUM];
+gchar *actions[TETRINET_TOTAL_KEYS];
 
 struct themelistentry {
     char dir[1024];
@@ -537,42 +528,42 @@ void prefdialog_destroy (void)
 
 void prefdialog_drawkeys (void)
 {
-    gchar *gconf_keys[K_NUM];
+    gchar *gconf_keys[TETRINET_TOTAL_KEYS];
     int i;
     GtkTreeIter iter;
     GtkListStore *keys_store = GTK_LIST_STORE (gtk_tree_view_get_model (GTK_TREE_VIEW (keyclist)));
 
-    actions[K_RIGHT]    = _("Move right");
-    actions[K_LEFT]     = _("Move left");
-    actions[K_DOWN]     = _("Move down");
-    actions[K_ROTRIGHT] = _("Rotate right");
-    actions[K_ROTLEFT]  = _("Rotate left");
-    actions[K_DROP]     = _("Drop piece");
-    actions[K_DISCARD]  = _("Discard special");
-    actions[K_GAMEMSG]  = _("Send message");
-    actions[K_SPECIAL1] = _("Special to field 1");
-    actions[K_SPECIAL2] = _("Special to field 2");
-    actions[K_SPECIAL3] = _("Special to field 3");
-    actions[K_SPECIAL4] = _("Special to field 4");
-    actions[K_SPECIAL5] = _("Special to field 5");
-    actions[K_SPECIAL6] = _("Special to field 6");
+    actions[TETRINET_RIGHT]    = _("Move right");
+    actions[TETRINET_LEFT]     = _("Move left");
+    actions[TETRINET_DOWN]     = _("Move down");
+    actions[TETRINET_ROTRIGHT] = _("Rotate right");
+    actions[TETRINET_ROTLEFT]  = _("Rotate left");
+    actions[TETRINET_DROP]     = _("Drop piece");
+    actions[TETRINET_DISCARD]  = _("Discard special");
+    actions[TETRINET_GAMEMSG]  = _("Send message");
+    actions[TETRINET_SPECIAL1] = _("Special to field 1");
+    actions[TETRINET_SPECIAL2] = _("Special to field 2");
+    actions[TETRINET_SPECIAL3] = _("Special to field 3");
+    actions[TETRINET_SPECIAL4] = _("Special to field 4");
+    actions[TETRINET_SPECIAL5] = _("Special to field 5");
+    actions[TETRINET_SPECIAL6] = _("Special to field 6");
   
-    gconf_keys[K_RIGHT]    = g_strdup ("/apps/gtetrinet/keys/right");
-    gconf_keys[K_LEFT]     = g_strdup ("/apps/gtetrinet/keys/left");
-    gconf_keys[K_DOWN]     = g_strdup ("/apps/gtetrinet/keys/down");
-    gconf_keys[K_ROTRIGHT] = g_strdup ("/apps/gtetrinet/keys/rotate_right");
-    gconf_keys[K_ROTLEFT]  = g_strdup ("/apps/gtetrinet/keys/rotate_left");
-    gconf_keys[K_DROP]     = g_strdup ("/apps/gtetrinet/keys/drop");
-    gconf_keys[K_DISCARD]  = g_strdup ("/apps/gtetrinet/keys/discard");
-    gconf_keys[K_GAMEMSG]  = g_strdup ("/apps/gtetrinet/keys/message");
-    gconf_keys[K_SPECIAL1] = g_strdup ("/apps/gtetrinet/keys/special1");
-    gconf_keys[K_SPECIAL2] = g_strdup ("/apps/gtetrinet/keys/special2");
-    gconf_keys[K_SPECIAL3] = g_strdup ("/apps/gtetrinet/keys/special3");
-    gconf_keys[K_SPECIAL4] = g_strdup ("/apps/gtetrinet/keys/special4");
-    gconf_keys[K_SPECIAL5] = g_strdup ("/apps/gtetrinet/keys/special5");
-    gconf_keys[K_SPECIAL6] = g_strdup ("/apps/gtetrinet/keys/special6");
+    gconf_keys[TETRINET_RIGHT]    = g_strdup ("/apps/gtetrinet/keys/right");
+    gconf_keys[TETRINET_LEFT]     = g_strdup ("/apps/gtetrinet/keys/left");
+    gconf_keys[TETRINET_DOWN]     = g_strdup ("/apps/gtetrinet/keys/down");
+    gconf_keys[TETRINET_ROTRIGHT] = g_strdup ("/apps/gtetrinet/keys/rotate_right");
+    gconf_keys[TETRINET_ROTLEFT]  = g_strdup ("/apps/gtetrinet/keys/rotate_left");
+    gconf_keys[TETRINET_DROP]     = g_strdup ("/apps/gtetrinet/keys/drop");
+    gconf_keys[TETRINET_DISCARD]  = g_strdup ("/apps/gtetrinet/keys/discard");
+    gconf_keys[TETRINET_GAMEMSG]  = g_strdup ("/apps/gtetrinet/keys/message");
+    gconf_keys[TETRINET_SPECIAL1] = g_strdup ("/apps/gtetrinet/keys/special1");
+    gconf_keys[TETRINET_SPECIAL2] = g_strdup ("/apps/gtetrinet/keys/special2");
+    gconf_keys[TETRINET_SPECIAL3] = g_strdup ("/apps/gtetrinet/keys/special3");
+    gconf_keys[TETRINET_SPECIAL4] = g_strdup ("/apps/gtetrinet/keys/special4");
+    gconf_keys[TETRINET_SPECIAL5] = g_strdup ("/apps/gtetrinet/keys/special5");
+    gconf_keys[TETRINET_SPECIAL6] = g_strdup ("/apps/gtetrinet/keys/special6");
 
-    for (i = 0; i < K_NUM; i ++) {
+    for (i = 0; i < TETRINET_TOTAL_KEYS; i ++) {
         gtk_list_store_append (keys_store, &iter);
         gtk_list_store_set (keys_store, &iter,
                             0, actions[i],
@@ -581,7 +572,7 @@ void prefdialog_drawkeys (void)
                             3, gconf_keys[i], -1);
     }
     
-    for (i = 0; i < K_NUM; i++) g_free (gconf_keys[i]);
+    for (i = 0; i < TETRINET_TOTAL_KEYS; i++) g_free (gconf_keys[i]);
 }
 
 void prefdialog_restorekeys (void)
@@ -683,16 +674,15 @@ void prefdialog_miditoggle (GtkWidget *widget)
 void prefdialog_midichanged (void)
 {
     gconf_client_set_string (gconf_client, "/apps/gtetrinet/sound/midi_player",
-                             gtk_entry_get_text (GTK_ENTRY (gnome_entry_gtk_entry (GNOME_ENTRY (midientry)))),
+                             gtk_entry_get_text (GTK_ENTRY (midientry)),
                              NULL);
 }
 
 void prefdialog_restoremidi (void)
 {
-    gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(midientry))),
-                        DEFAULTMIDICMD);
+    gtk_entry_set_text (GTK_ENTRY(midientry), DEFAULTMIDICMD);
     gconf_client_set_string (gconf_client, "/apps/gtetrinet/sound/midi_player",
-                             gtk_entry_get_text (GTK_ENTRY (gnome_entry_gtk_entry (GNOME_ENTRY (midientry)))),
+                             gtk_entry_get_text (GTK_ENTRY (midientry)),
                              NULL);
 }
 
@@ -1011,7 +1001,7 @@ void prefdialog_new (void)
     divider = gtk_hseparator_new ();
     gtk_widget_show (divider);
 
-    midientry = gnome_entry_new ("MidiCmd");
+    midientry = gtk_entry_new ();
     gtk_widget_show (midientry);
 
     widget = leftlabel_new (_("Enter command to play a midi file:"));
@@ -1061,7 +1051,7 @@ void prefdialog_new (void)
     /* init stuff */
     prefdialog_themelist ();
 
-    gtk_entry_set_text (GTK_ENTRY(gnome_entry_gtk_entry(GNOME_ENTRY(midientry))), midicmd);
+    gtk_entry_set_text (GTK_ENTRY (midientry), midicmd);
 
     prefdialog_drawkeys ();
 
@@ -1085,7 +1075,7 @@ void prefdialog_new (void)
                       GTK_SIGNAL_FUNC(prefdialog_soundtoggle), NULL);
     g_signal_connect (G_OBJECT(midicheck), "toggled",
                       GTK_SIGNAL_FUNC(prefdialog_miditoggle), NULL);
-    g_signal_connect (G_OBJECT(gnome_entry_gtk_entry(GNOME_ENTRY(midientry))),
+    g_signal_connect (G_OBJECT (midientry),
                       "changed", GTK_SIGNAL_FUNC(prefdialog_midichanged), NULL);
     g_signal_connect (G_OBJECT(theme_selection), "changed",
                       GTK_SIGNAL_FUNC (prefdialog_themeselect), NULL);

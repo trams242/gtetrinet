@@ -1,8 +1,9 @@
 #include <gnome.h>
+#include <libgnomeui/libgnomeui.h>
 #include <gconf/gconf-client.h>
 #include <dirent.h>
 
-#include "tetrinet.h"
+#include "gtetrinet.h"
 #include "misc.h"
 #include "sound.h"
 #include "config.h"
